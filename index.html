@@ -2,420 +2,648 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Atticus Face Editor</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#1a1612" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Atticus · Face Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f0c0a" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #1a1612;
-    --panel: #221c17;
-    --panel2: #2a221c;
-    --line: #3a2f26;
-    --ink: #f3ead9;
-    --dim: #a39686;
-    --orange: #ff8a2b;
-    --orange-soft: #ff9d4d;
-    --green: #7cd17e;
-    --red: #e7615b;
-    --accent: #ff8a2b;
-  }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
-  button, input, select { font: inherit; color: inherit; }
-  button { cursor: pointer; }
-
-  /* Layout — desktop */
-  .app { display: grid; grid-template-columns: 220px 1fr 320px; grid-template-rows: 56px 1fr; height: 100vh; }
-  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; flex-wrap: nowrap; }
-  header .title { font-weight: 600; letter-spacing: .2px; white-space: nowrap; flex-shrink: 0; }
-  header .title em { color: var(--orange); font-style: normal; }
-  header .spacer { flex: 1; min-width: 4px; }
-  header button { padding: 8px 12px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; white-space: nowrap; flex-shrink: 0; min-height: 36px; }
-  header button.primary { background: var(--orange); color: #1a1208; border-color: var(--orange); font-weight: 600; }
-  header button.primary:hover { background: var(--orange-soft); }
-  header button:hover { border-color: var(--orange); }
-  header .badge { padding: 4px 10px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; color: var(--dim); white-space: nowrap; flex-shrink: 0; }
-
-  header button .short { display: none; }
-  header button .full { display: inline; }
-
-  /* Mobile-only nav for switching panels */
-  .mobile-tabs { display: none; }
-
-  aside.left { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; grid-column: 1; grid-row: 2; }
-  aside.right { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; grid-column: 3; grid-row: 2; }
-  main { display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px; overflow: auto; grid-column: 2; grid-row: 2; }
-
-  /* Canvas — desktop fixed 2x */
-  .canvas-wrap { position: relative; background: #000; border: 2px solid var(--line); border-radius: 8px; box-shadow: 0 8px 32px #0008; max-width: 100%; }
-  canvas#stage { display: block; image-rendering: pixelated; width: 640px; height: 480px; max-width: 100%; height: auto; aspect-ratio: 320 / 240; touch-action: none; }
-
-  /* =========================================================
-     MOBILE — single-column stacked layout with tab switcher
-     ========================================================= */
-  @media (max-width: 900px) {
-    .app {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto auto 1fr;
-      height: auto;
-      min-height: 100vh;
-    }
-    header {
-      grid-column: 1;
-      grid-row: 1;
-      padding: 8px 10px;
-      gap: 6px;
-      flex-wrap: wrap;
-      height: auto;
-      align-items: stretch;
-    }
-    header .title { font-size: 15px; padding-top: 6px; }
-    header .badge { display: none; }
-    header .spacer { display: none; }
-    header button { padding: 8px 10px; font-size: 13px; flex: 1 1 auto; min-width: 0; }
-    header button .full { display: none; }
-    header button .short { display: inline; }
-
-    .mobile-tabs {
-      display: flex;
-      grid-column: 1;
-      grid-row: 2;
-      background: var(--panel);
-      border-bottom: 1px solid var(--line);
-      padding: 0;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
-    .mobile-tabs button {
-      flex: 1;
-      padding: 12px 4px;
-      background: transparent;
-      color: var(--dim);
-      border: 0;
-      border-bottom: 2px solid transparent;
-      font-size: 13px;
-      font-weight: 500;
-      min-height: 44px;
-    }
-    .mobile-tabs button.active {
-      color: var(--orange);
-      border-bottom-color: var(--orange);
-    }
-
-    aside.left, main, aside.right {
-      grid-column: 1;
-      grid-row: 3;
-      border: 0;
-      max-height: none;
-      overflow: visible;
-    }
-    aside.left { display: none; }
-    main { display: none; padding: 12px; }
-    aside.right { display: none; }
-
-    .app[data-mtab="canvas"] main { display: flex; }
-    .app[data-mtab="expressions"] aside.left { display: block; }
-    .app[data-mtab="properties"] aside.right { display: block; }
-
-    canvas#stage { width: 100%; max-width: 100%; height: auto; }
-    .canvas-wrap { width: 100%; }
-
-    .play-bar { width: 100%; flex-wrap: wrap; gap: 8px; padding: 10px; }
-    .play-bar button { padding: 10px 14px; min-height: 44px; flex: 0 0 auto; }
-    .play-bar input[type=range] { min-width: 100%; flex: 1 1 100%; order: 99; height: 32px; }
-    .play-bar .time { min-width: 60px; }
-
-    .canvas-info { width: 100%; justify-content: space-between; font-size: 11px; }
-
-    .group { padding: 14px 12px; }
-    .group h3 { font-size: 12px; }
-
-    .expr-tab, .elem-row { padding: 12px; font-size: 14px; min-height: 44px; }
-    .expr-tab .anim-dot { width: 10px; height: 10px; }
-
-    .add-elem button { padding: 12px 8px; font-size: 13px; min-height: 44px; }
-
-    .prop-row { grid-template-columns: 80px 1fr auto; gap: 10px; margin: 10px 0; }
-    .prop-row input[type=number], .prop-row input[type=text] {
-      padding: 10px; font-size: 16px;  /* >=16 prevents iOS zoom on focus */
-      min-height: 44px;
-    }
-    .prop-row input[type=color] { width: 48px; height: 44px; }
-    .prop-row button.key { padding: 10px 12px; min-height: 44px; min-width: 44px; }
-
-    .kf-row { font-size: 14px; grid-template-columns: 60px 1fr 44px; gap: 8px; margin: 8px 0; }
-    .kf-row input { padding: 10px; font-size: 16px; min-height: 44px; }
-    .kf-row button { font-size: 18px; min-height: 44px; min-width: 44px; }
-
-    .hint { font-size: 11px; padding: 10px 12px; }
-
-    .modal { width: 95%; max-width: none; padding: 14px; max-height: 90vh; }
-    .modal textarea { font-size: 13px; min-height: 50vh; }
-    .modal-actions button { padding: 12px 18px; min-height: 44px; }
+    --bg:           oklch(0.16 0.012 55);
+    --bg-deep:      oklch(0.11 0.010 55);
+    --surface:      oklch(0.20 0.014 55);
+    --surface-2:    oklch(0.24 0.016 55);
+    --line:         oklch(0.30 0.020 55);
+    --line-soft:    oklch(0.26 0.016 55 / 0.6);
+    --ink:          oklch(0.96 0.012 80);
+    --ink-dim:      oklch(0.74 0.014 70);
+    --ink-faint:    oklch(0.55 0.014 65);
+    --orange:       oklch(0.78 0.18 55);
+    --orange-deep:  oklch(0.66 0.21 45);
+    --orange-glow:  oklch(0.78 0.18 55 / 0.18);
+    --green:        oklch(0.78 0.16 145);
+    --red:          oklch(0.68 0.20 25);
+    --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+    --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.35);
+    --shadow-stage: 0 24px 60px oklch(0 0 0 / 0.55), 0 0 0 1px var(--line) inset;
+    --display: "Instrument Serif", "Times New Roman", serif;
+    --body: "Sora", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
 
-  .canvas-info { color: var(--dim); font-size: 12px; display: flex; gap: 16px; }
-  .canvas-info span b { color: var(--ink); font-weight: 600; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; background: var(--bg-deep); color: var(--ink);
+    font: 14px/1.45 var(--body);
+    overflow: hidden; overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+    background:
+      radial-gradient(ellipse at 75% -10%, oklch(0.78 0.18 55 / 0.10), transparent 50%),
+      radial-gradient(ellipse at -10% 90%, oklch(0.50 0.10 30 / 0.06), transparent 55%);
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; background: none; border: none; padding: 0; }
+  input[type=number], input[type=text] { font-size: 16px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; border: 2px solid var(--bg-deep); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
 
-  .play-bar { display: flex; align-items: center; gap: 12px; background: var(--panel); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); }
-  .play-bar button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; color: var(--ink); }
-  .play-bar button.play { background: var(--orange); border-color: var(--orange); color: #1a1208; font-weight: 600; }
-  .play-bar .time { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 60px; text-align: right; }
-  .play-bar input[type=range] { flex: 1; min-width: 200px; }
+  .app { display: grid; height: 100dvh; grid-template-rows: auto 1fr; background: var(--bg); }
 
-  /* Sidebar groups */
-  .group { padding: 14px 14px 8px; border-bottom: 1px solid var(--line); }
-  .group h3 { margin: 0 0 10px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  /* ---------- Top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 18px;
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: baseline; gap: 8px; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--orange) 0%, var(--orange-deep) 100%);
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px var(--orange-glow), 0 0 0 1px oklch(1 0 0 / 0.08) inset;
+    color: oklch(0.18 0.05 50); font-size: 14px;
+    transform: translateY(2px);
+  }
+  .brand h1 {
+    margin: 0; font: 400 22px/1 var(--display);
+    letter-spacing: -0.01em;
+  }
+  .brand h1 em {
+    font-style: italic; color: var(--orange);
+  }
+  .brand .sub {
+    font: 500 10px/1 var(--body); letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-faint); padding-left: 10px; margin-left: 4px;
+    border-left: 1px solid var(--line);
+  }
+  .spacer { flex: 1; }
 
-  /* Expression tabs */
-  .expr-list { display: flex; flex-direction: column; gap: 4px; }
-  .expr-tab { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--panel2); border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
-  .expr-tab:hover { border-color: var(--line); }
-  .expr-tab.active { border-color: var(--orange); background: rgba(255, 138, 43, .1); }
-  .expr-tab .name { font-weight: 500; }
-  .expr-tab .anim-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
-  .expr-tab .anim-dot.has { background: var(--green); }
+  .iconbtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 6px; padding: 7px 12px;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--r-sm);
+    font: 500 13px/1 var(--body); min-height: 36px;
+    transition: border-color .15s, background .15s, transform .1s;
+  }
+  .iconbtn:hover { border-color: var(--orange); background: oklch(0.22 0.014 55); }
+  .iconbtn:active { transform: scale(0.97); }
+  .iconbtn.primary { background: linear-gradient(180deg, var(--orange) 0%, var(--orange-deep) 100%); color: oklch(0.16 0.05 50); border-color: var(--orange-deep); font-weight: 600; }
+  .iconbtn .glyph { font-size: 14px; line-height: 1; }
 
-  /* Element list */
-  .elem-list { display: flex; flex-direction: column; gap: 4px; }
-  .elem-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel2); border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
-  .elem-row:hover { border-color: var(--line); }
-  .elem-row.active { border-color: var(--orange); background: rgba(255, 138, 43, .08); }
-  .elem-row .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 1px solid #0006; }
-  .elem-row .label { flex: 1; font-size: 13px; }
-  .elem-row .anim-mark { color: var(--green); font-size: 10px; }
-  .elem-row button.del { background: transparent; border: 0; color: var(--dim); padding: 2px 6px; border-radius: 4px; }
-  .elem-row button.del:hover { color: var(--red); }
+  .live {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px 6px 10px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 999px; font-size: 12px; color: var(--ink-dim);
+    min-height: 36px;
+    transition: all .2s;
+  }
+  .live .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--ink-faint);
+    box-shadow: 0 0 0 0 transparent;
+    transition: all .2s;
+  }
+  .live.on { color: var(--ink); border-color: oklch(0.40 0.12 145); background: oklch(0.22 0.05 145); }
+  .live.on .dot {
+    background: var(--green);
+    box-shadow: 0 0 0 4px oklch(0.78 0.16 145 / 0.18);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 4px oklch(0.78 0.16 145 / 0.18); } 50% { box-shadow: 0 0 0 8px oklch(0.78 0.16 145 / 0.05); } }
 
-  .add-elem { display: flex; gap: 4px; margin-top: 8px; }
-  .add-elem button { flex: 1; padding: 6px 4px; background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font-size: 12px; }
-  .add-elem button:hover { border-color: var(--orange); }
+  /* ---------- Main grid ---------- */
+  .main { display: grid; grid-template-columns: 220px 1fr 340px; min-height: 0; }
 
-  /* Canvas area */
-  /* (moved to layout block above) */
+  /* ---------- Strip (expressions) ---------- */
+  .strip {
+    background: var(--bg-deep); border-right: 1px solid var(--line);
+    overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .strip-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 4px 4px;
+  }
+  .strip-head h3 {
+    margin: 0; font: 500 10px/1 var(--body); letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .strip-head .count { font: 500 11px/1 var(--mono); color: var(--ink-faint); }
 
-  /* Property panel */
-  .prop-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 8px; align-items: center; margin: 6px 0; }
-  .prop-row label { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
-  .prop-row input[type=number], .prop-row input[type=text], .prop-row select { width: 100%; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; color: var(--ink); }
-  .prop-row input[type=color] { width: 38px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: transparent; cursor: pointer; }
-  .prop-row button.key { background: transparent; border: 1px solid var(--line); color: var(--dim); padding: 3px 7px; border-radius: 4px; font-size: 11px; }
-  .prop-row button.key.has { background: var(--green); border-color: var(--green); color: #0a1f0a; }
+  .expr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px;
+    background: var(--surface); border: 1px solid transparent; border-radius: var(--r-md);
+    cursor: pointer; min-height: 60px;
+    transition: all .15s;
+  }
+  .expr:hover { border-color: var(--line); background: var(--surface-2); }
+  .expr.active {
+    border-color: var(--orange);
+    background: linear-gradient(135deg, oklch(0.22 0.05 55) 0%, var(--surface) 100%);
+    box-shadow: 0 0 0 1px var(--orange-glow), 0 4px 14px oklch(0 0 0 / 0.3);
+  }
+  .expr canvas {
+    width: 60px; height: 45px; image-rendering: pixelated;
+    border-radius: var(--r-sm); background: #000;
+    flex-shrink: 0; box-shadow: 0 0 0 1px var(--line);
+  }
+  .expr .info { flex: 1; min-width: 0; }
+  .expr .info .name {
+    font: 500 13px/1.2 var(--body);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .expr .info .meta { font: 400 11px/1.4 var(--mono); color: var(--ink-faint); margin-top: 3px; }
+  .expr .info .meta .ani { color: var(--green); }
+  .expr-add {
+    padding: 12px; background: transparent; border: 1px dashed var(--line);
+    border-radius: var(--r-md); color: var(--ink-dim); font: 500 12px/1 var(--body);
+    text-align: center; transition: all .15s; min-height: 44px;
+  }
+  .expr-add:hover { border-color: var(--orange); border-style: solid; color: var(--ink); background: var(--surface); }
 
-  .keyframes { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
-  .kf-row { display: grid; grid-template-columns: 60px 1fr auto; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
-  .kf-row .t { color: var(--orange); font-variant-numeric: tabular-nums; }
-  .kf-row button { background: transparent; border: 0; color: var(--dim); padding: 0 4px; }
+  /* ---------- Stage ---------- */
+  .stage-wrap {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse at 50% 0%, oklch(0.22 0.04 55 / 0.4), transparent 60%),
+      radial-gradient(ellipse at 50% 100%, oklch(0.10 0.02 30 / 0.5), transparent 50%);
+  }
+  .stage-host {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 32px 24px; min-height: 0;
+  }
+  .stage-box {
+    position: relative; background: #000;
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-stage);
+    max-width: 100%; max-height: 100%;
+  }
+  .stage-box::before {
+    content: ""; position: absolute; inset: -6px; border-radius: 18px;
+    background: linear-gradient(135deg, var(--orange-glow), transparent 50%);
+    z-index: -1; opacity: 0.6; filter: blur(12px);
+  }
+  canvas#stage { display: block; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; border-radius: var(--r-lg); }
+
+  .stage-meta {
+    padding: 10px 18px; font: 400 11px/1 var(--mono); color: var(--ink-faint);
+    display: flex; gap: 20px; background: var(--bg-deep);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  }
+  .stage-meta .item { display: flex; gap: 6px; align-items: baseline; }
+  .stage-meta .item span { color: var(--ink-faint); text-transform: uppercase; letter-spacing: .12em; font-size: 9px; }
+  .stage-meta .item b { color: var(--ink); font-weight: 500; }
+  .stage-meta .item b.accent { color: var(--orange); }
+
+  /* ---------- Timeline ---------- */
+  .timeline {
+    background: var(--bg-deep); padding: 10px 18px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .tbtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: var(--r-sm);
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--ink);
+    font-size: 14px; transition: all .15s;
+  }
+  .tbtn:hover { border-color: var(--orange); }
+  .tbtn.play {
+    background: linear-gradient(180deg, var(--orange) 0%, var(--orange-deep) 100%);
+    color: oklch(0.16 0.05 50); border-color: var(--orange-deep);
+    box-shadow: 0 4px 14px var(--orange-glow);
+  }
+  .timeline .scrub-wrap { flex: 1; min-width: 0; position: relative; height: 40px; display: flex; align-items: center; }
+  .timeline input[type=range] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 6px; background: var(--surface-2); border-radius: 999px;
+    border: 1px solid var(--line); outline: none;
+  }
+  .timeline input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+    background: var(--orange); box-shadow: 0 0 0 3px oklch(0.16 0.012 55), 0 2px 8px var(--orange-glow);
+  }
+  .timeline input[type=range]:disabled { opacity: 0.35; }
+  .timeline .time { font: 500 12px/1 var(--mono); color: var(--ink-dim); min-width: 64px; text-align: right; }
+
+  /* ---------- Inspector ---------- */
+  .inspector {
+    background: var(--bg-deep); border-left: 1px solid var(--line);
+    overflow-y: auto;
+  }
+  .group { padding: 16px 18px; border-bottom: 1px solid var(--line-soft); }
+  .group:last-child { border-bottom: none; }
+  .group-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 0 0 12px;
+  }
+  .group-head .label {
+    font: 500 10px/1 var(--body); letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .group-head .sub {
+    font: 400 18px/1 var(--display); letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .group-head .sub em { font-style: italic; color: var(--orange); }
+
+  /* property rows */
+  .prop {
+    display: grid; grid-template-columns: 64px 1fr 38px;
+    gap: 8px; align-items: center; margin: 8px 0;
+  }
+  .prop > label {
+    color: var(--ink-faint); font: 500 10px/1 var(--body);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .prop input[type=text] {
+    width: 100%; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-sm); color: var(--ink); min-height: 36px;
+    font: 400 13px/1 var(--body); transition: border-color .15s;
+  }
+  .prop input[type=text]:focus { outline: none; border-color: var(--orange); background: var(--surface-2); }
+  .prop input[type=color] {
+    width: 38px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
+  }
+
+  .slider {
+    display: grid; grid-template-columns: 64px 1fr 48px 38px;
+    gap: 8px; align-items: center; margin: 10px 0;
+  }
+  .slider > label {
+    color: var(--ink-faint); font: 500 10px/1 var(--body);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .slider input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 4px; background: var(--surface-2);
+    border-radius: 999px; border: 1px solid var(--line); outline: none;
+  }
+  .slider input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px; border-radius: 50%; cursor: pointer;
+    background: var(--ink); box-shadow: 0 0 0 3px var(--bg-deep);
+  }
+  .slider .val {
+    font: 500 12px/1 var(--mono); color: var(--ink-dim);
+    text-align: right; padding-right: 4px;
+  }
+
+  .key {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 36px;
+    background: transparent; border: 1px solid var(--line); color: var(--ink-faint);
+    border-radius: var(--r-sm); font-size: 13px;
+    transition: all .15s;
+  }
+  .key:hover { color: var(--orange); border-color: var(--orange); }
+  .key.has {
+    background: oklch(0.40 0.14 145); border-color: oklch(0.55 0.16 145);
+    color: oklch(0.95 0.05 145);
+    box-shadow: 0 0 0 1px oklch(0.55 0.16 145 / 0.4);
+  }
+
+  /* parts grid */
+  .parts-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  }
+  .part {
+    display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+    background: var(--surface); border: 1px solid transparent;
+    border-radius: var(--r-md); cursor: pointer; min-height: 44px;
+    transition: all .15s;
+  }
+  .part:hover { background: var(--surface-2); border-color: var(--line); }
+  .part.active {
+    border-color: var(--orange);
+    background: oklch(0.22 0.05 55);
+    box-shadow: 0 0 0 1px var(--orange-glow);
+  }
+  .part .swatch {
+    width: 14px; height: 14px; border-radius: 4px;
+    border: 1px solid oklch(0 0 0 / 0.4); flex-shrink: 0;
+    box-shadow: 0 0 0 1px oklch(1 0 0 / 0.06);
+  }
+  .part .nm {
+    flex: 1; font: 500 12px/1.2 var(--body);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .part .anim { color: var(--green); font-size: 9px; }
+  .part .del {
+    color: var(--ink-faint); padding: 2px 4px; line-height: 1;
+    font-size: 16px; opacity: 0; transition: opacity .15s;
+  }
+  .part:hover .del, .part.active .del { opacity: 1; }
+  .part .del:hover { color: var(--red); }
+
+  .add-row { display: flex; gap: 6px; margin-top: 10px; }
+  .add-row button {
+    flex: 1; padding: 9px 6px; background: var(--surface); border: 1px dashed var(--line);
+    border-radius: var(--r-sm); color: var(--ink-dim);
+    font: 500 11px/1 var(--body); text-transform: uppercase; letter-spacing: 0.08em;
+    min-height: 40px; transition: all .15s;
+  }
+  .add-row button:hover { border-color: var(--orange); border-style: solid; color: var(--ink); background: var(--surface-2); }
+
+  .meta-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; margin: 8px 0; }
+  .meta-row > label {
+    color: var(--ink-faint); font: 500 10px/1 var(--body);
+    text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .meta-row input {
+    padding: 8px 10px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-sm); color: var(--ink); min-height: 36px;
+    font: 400 13px/1 var(--body);
+  }
+  .meta-row input:focus { outline: none; border-color: var(--orange); }
+
+  .row-btns { display: flex; gap: 6px; margin-top: 12px; }
+  .row-btns button {
+    flex: 1; padding: 9px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-sm); color: var(--ink-dim);
+    font: 500 11px/1 var(--body); text-transform: uppercase; letter-spacing: 0.08em;
+    min-height: 38px;
+  }
+  .row-btns button:hover { color: var(--ink); border-color: var(--orange); }
+  .row-btns button.danger:hover { color: var(--red); border-color: var(--red); }
+
+  .empty {
+    padding: 24px 12px; text-align: center;
+    color: var(--ink-faint); font: 400 13px/1.5 var(--body);
+  }
+  .empty em { font: italic 16px/1.4 var(--display); color: var(--ink-dim); }
+
+  .keyframes-block {
+    margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line);
+  }
+  .kf-head {
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--green); font: 500 11px/1 var(--mono);
+    margin: 8px 0 6px; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .kf-head button { color: var(--ink-faint); font: 400 10px/1 var(--body); text-transform: uppercase; letter-spacing: 0.08em; }
+  .kf-head button:hover { color: var(--red); }
+  .kf-row {
+    display: grid; grid-template-columns: 56px 1fr 28px; gap: 6px;
+    align-items: center; margin: 4px 0; font-size: 12px;
+  }
+  .kf-row .t { color: var(--orange); font: 500 11px/1 var(--mono); }
+  .kf-row input {
+    padding: 6px 8px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-sm); color: var(--ink); font: 400 12px/1 var(--mono);
+    min-height: 30px; width: 100%;
+  }
+  .kf-row button {
+    color: var(--ink-faint); padding: 4px; font-size: 14px;
+    min-height: 30px; line-height: 1;
+  }
   .kf-row button:hover { color: var(--red); }
 
-  .expr-meta { padding: 10px 14px; border-bottom: 1px solid var(--line); }
-  .expr-meta .prop-row { grid-template-columns: 80px 1fr; }
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(40px);
+    background: var(--orange); color: oklch(0.16 0.05 50);
+    padding: 10px 18px; border-radius: 999px;
+    font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: 0.08em;
+    z-index: 9999; pointer-events: none;
+    box-shadow: 0 8px 24px oklch(0 0 0 / 0.4), 0 0 0 1px oklch(1 0 0 / 0.12) inset;
+    opacity: 0;
+    animation: toastIn .25s ease-out forwards, toastOut .3s ease-out 1.1s forwards;
+  }
+  @keyframes toastIn { to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+  @keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(-12px); } }
 
-  /* Empty state */
-  .empty { padding: 20px; text-align: center; color: var(--dim); font-size: 13px; }
+  /* ---------- Modal ---------- */
+  .modal-bg {
+    position: fixed; inset: 0; background: oklch(0 0 0 / 0.7);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 16px; animation: fadeIn .2s ease-out;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: 22px; max-width: 720px; width: 100%; max-height: 90vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 60px oklch(0 0 0 / 0.6);
+    animation: modalIn .25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal h2 { margin: 0 0 14px; font: 400 22px/1 var(--display); }
+  .modal h2 em { color: var(--orange); font-style: italic; }
+  .modal textarea {
+    flex: 1; min-height: 300px; background: var(--bg-deep); color: var(--ink);
+    border: 1px solid var(--line); border-radius: var(--r-sm); padding: 12px;
+    font: 400 12px/1.55 var(--mono); resize: vertical; outline: none;
+  }
+  .modal textarea:focus { border-color: var(--orange); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  .modal-actions button {
+    padding: 9px 18px; border-radius: var(--r-sm); border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); min-height: 40px;
+    font: 500 13px/1 var(--body);
+  }
+  .modal-actions button.primary {
+    background: linear-gradient(180deg, var(--orange) 0%, var(--orange-deep) 100%);
+    color: oklch(0.16 0.05 50); border-color: var(--orange-deep); font-weight: 600;
+  }
+  .modal-actions button:hover { border-color: var(--orange); }
 
-  .hint { padding: 8px 14px; font-size: 11px; color: var(--dim); border-top: 1px solid var(--line); background: var(--panel2); }
-  .hint code { background: var(--bg); padding: 1px 4px; border-radius: 3px; color: var(--orange); }
+  /* ============================================
+   *  MOBILE
+   *  Canvas pinned top, controls in sticky sheet
+   * ============================================ */
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .strip { display: none; }
+    .inspector { display: none; }
+    .stage-host { padding: 12px; }
+    .stage-meta { padding: 6px 12px; gap: 14px; font-size: 10px; }
+    .stage-meta .item span { font-size: 8px; }
+    .timeline { padding: 8px 12px; gap: 8px; }
+    .tbtn { width: 36px; height: 36px; }
+    .timeline .time { min-width: 52px; font-size: 11px; }
 
-  /* Modal */
-  .modal-bg { position: fixed; inset: 0; background: #000a; display: flex; align-items: center; justify-content: center; z-index: 100; }
-  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; max-width: 720px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
-  .modal h2 { margin: 0 0 12px; }
-  .modal textarea { flex: 1; min-height: 400px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: 12px/1.5 "SF Mono", Menlo, monospace; resize: vertical; }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
-  .modal-actions button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); }
-  .modal-actions button.primary { background: var(--orange); color: #1a1208; border-color: var(--orange); font-weight: 600; }
+    .sheet {
+      background: var(--bg-deep); border-top: 1px solid var(--line);
+      max-height: 52vh; display: flex; flex-direction: column; min-height: 0;
+    }
+    .sheet-tabs {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      background: var(--bg); border-bottom: 1px solid var(--line);
+    }
+    .sheet-tabs button {
+      padding: 12px 8px; color: var(--ink-faint);
+      font: 600 11px/1 var(--body); text-transform: uppercase; letter-spacing: 0.12em;
+      border-bottom: 2px solid transparent; min-height: 44px;
+      transition: all .15s;
+    }
+    .sheet-tabs button.active {
+      color: var(--ink); border-bottom-color: var(--orange);
+      background: var(--bg-deep);
+    }
+    .sheet-body { flex: 1; overflow-y: auto; min-height: 0; }
+    .sheet-body .group { padding: 14px 16px; }
+
+    .expr-strip-mobile {
+      display: flex; gap: 10px; padding: 14px 16px;
+      overflow-x: auto; scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .expr-strip-mobile .expr {
+      flex-direction: column; width: 96px; flex-shrink: 0;
+      scroll-snap-align: start; padding: 8px; gap: 6px;
+    }
+    .expr-strip-mobile .expr canvas { width: 80px; height: 60px; }
+    .expr-strip-mobile .expr .info { width: 100%; text-align: center; }
+    .expr-strip-mobile .expr .info .name { font-size: 11px; }
+    .expr-strip-mobile .expr .info .meta { font-size: 9px; }
+    .expr-strip-mobile .expr-add {
+      flex-shrink: 0; width: 96px; display: flex; align-items: center;
+      justify-content: center; padding: 8px; min-height: 96px;
+    }
+
+    .topbar { padding: 10px 12px; gap: 6px; }
+    .brand h1 { font-size: 18px; }
+    .brand .sub { display: none; }
+    .iconbtn { padding: 7px 10px; font-size: 12px; min-width: 36px; }
+    .iconbtn .lbl-long { display: none; }
+    .live { padding: 6px 10px 6px 8px; font-size: 11px; }
+  }
+  @media (min-width: 901px) { .sheet { display: none; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
 </style>
 </head>
 <body>
 
-<div class="app" data-mtab="canvas">
-  <header>
-    <div class="title">🐻 <em>face editor</em></div>
-    <span class="badge" id="dimsBadge">320 × 240</span>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <span class="mark">🐻</span>
+      <h1>atticus <em>face</em></h1>
+      <span class="sub">studio</span>
+    </div>
     <div class="spacer"></div>
-    <button id="btnSave" title="Save to browser localStorage"><span class="full">💾 Save</span><span class="short">💾</span></button>
-    <button id="btnLoad" title="Load from browser localStorage"><span class="full">📂 Load</span><span class="short">📂</span></button>
-    <button id="btnImport"><span class="full">Import JSON</span><span class="short">Import</span></button>
-    <button id="btnExportJson"><span class="full">Export JSON</span><span class="short">JSON</span></button>
-    <button id="btnExportC"><span class="full">Export C code</span><span class="short">C</span></button>
-    <button id="btnPush" class="primary"><span class="full">→ Push to Leo</span><span class="short">→ Leo</span></button>
-  </header>
+    <button id="btnLiveMirror" class="live"><span class="dot"></span><span class="lbl">Live Mirror</span></button>
+    <button id="btnSave" class="iconbtn" title="Save to browser"><span class="glyph">💾</span><span class="lbl-long">Save</span></button>
+    <button id="btnLoad" class="iconbtn" title="Load from browser"><span class="glyph">📂</span></button>
+    <button id="btnImport" class="iconbtn" title="Import JSON"><span class="glyph">⇣</span></button>
+    <button id="btnExportJson" class="iconbtn">JSON</button>
+    <button id="btnExportC" class="iconbtn primary">Export C</button>
+  </div>
 
-  <nav class="mobile-tabs" id="mobileTabs">
-    <button data-mtab="expressions">Expressions</button>
-    <button data-mtab="canvas" class="active">Canvas</button>
-    <button data-mtab="properties">Properties</button>
-  </nav>
+  <div class="main">
+    <!-- DESKTOP STRIP -->
+    <div class="strip">
+      <div class="strip-head">
+        <h3>Expressions</h3>
+        <span class="count" id="exprCount">0</span>
+      </div>
+      <div id="exprStripDesktop"></div>
+      <button class="expr-add" id="addExprDesktop">+ new expression</button>
+    </div>
 
-
-  <aside class="left">
-    <div class="group">
-      <h3>Expressions</h3>
-      <div class="expr-list" id="exprList"></div>
-      <div class="add-elem">
-        <button id="addExpr">+ new expression</button>
+    <!-- CANVAS + TIMELINE -->
+    <div class="stage-wrap">
+      <div class="stage-host" id="stageHost">
+        <div class="stage-box" id="stageBox">
+          <canvas id="stage" width="320" height="240"></canvas>
+        </div>
+      </div>
+      <div class="stage-meta">
+        <div class="item"><span>expr</span><b class="accent" id="metaExpr">—</b></div>
+        <div class="item"><span>selected</span><b id="metaSel">tap a part</b></div>
+        <div class="item"><span>cursor</span><b id="metaCur">—</b></div>
+      </div>
+      <div class="timeline">
+        <button id="btnPlay" class="tbtn play" title="Play/Pause">▶</button>
+        <button id="btnStop" class="tbtn" title="Stop">⏹</button>
+        <div class="scrub-wrap"><input type="range" id="scrub" min="0" max="2000" step="10" value="0" /></div>
+        <span class="time" id="playTime">0.00s</span>
       </div>
     </div>
-    <div class="expr-meta" id="exprMeta"></div>
-    <div class="group">
-      <h3>Elements</h3>
-      <div class="elem-list" id="elemList"></div>
-      <div class="add-elem">
-        <button data-add="ellipse">+ Ellipse</button>
-        <button data-add="rect">+ Rect</button>
-        <button data-add="arc">+ Arc</button>
-      </div>
-    </div>
-    <div class="hint">
-      Drag on canvas to move selected element.<br>
-      ↑/↓/←/→ nudges by 1px (shift = 10).
-    </div>
-  </aside>
 
-  <main>
-    <div class="canvas-wrap" id="canvasWrap">
-      <canvas id="stage" width="320" height="240"></canvas>
-    </div>
-    <div class="canvas-info">
-      <span>cursor: <b id="curPos">—</b></span>
-      <span>zoom: <b>2×</b></span>
-      <span id="selInfo"></span>
-    </div>
-    <div class="play-bar">
-      <button id="btnPlay" class="play">▶ Play</button>
-      <button id="btnStop">⏹</button>
-      <span class="time" id="playTime">0.00s</span>
-      <input type="range" id="scrub" min="0" max="2000" value="0" />
-    </div>
-  </main>
+    <!-- DESKTOP INSPECTOR -->
+    <div class="inspector" id="inspectorDesktop"></div>
+  </div>
 
-  <aside class="right" id="propsPane">
-    <div class="empty">Select an element to edit its properties.</div>
-  </aside>
+  <!-- MOBILE SHEET -->
+  <div class="sheet">
+    <div class="sheet-tabs">
+      <button data-sheet="parts" class="active">Parts</button>
+      <button data-sheet="props">Properties</button>
+      <button data-sheet="expr">Expressions</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
 </div>
 
 <script>
 'use strict';
 
 /* ============================================================
- * Atticus Face Editor — vector face spec + keyframe animation
- * ============================================================
- *
- * Data model (a face document is a JSON object):
- *
- *   {
- *     version: 1,
- *     width: 320, height: 240,
- *     background: "#000000",
- *     expressions: [
- *       {
- *         id: "neutral",
- *         name: "Neutral",
- *         duration: 0,             // 0 = static (no loop). >0 = animated, loops every duration ms.
- *         elements: [
- *           {
- *             id: "uuid",
- *             kind: "ellipse" | "rect" | "arc",
- *             // base props (used when no keyframe at t=0)
- *             x: 100, y: 100,
- *             // ellipse/rect:
- *             w: 56, h: 72,         // (ellipse: full width/height; rect: w/h)
- *             // arc:
- *             r: 24, thick: 5, start: 0, end: 180,  // start/end in degrees, 0=right, 90=down (canvas-y-down)
- *             color: "#f3ead9",
- *             keyframes: {
- *               // per-property animation tracks: prop -> [{ t: ms, v: value, easing: "linear"|"easeInOut" }]
- *               x: [{ t: 0, v: 100 }, { t: 500, v: 110 }, { t: 1000, v: 100 }],
- *               ...
- *             }
- *           }
- *         ]
- *       }
- *     ]
- *   }
- */
+ * Atticus Face Studio v2
+ * Direct-manipulation IA. Canvas always visible.
+ * ============================================================ */
 
-// ----- Default colors used in firmware (kept in sync with face_anim.c) -----
-const DEFAULT = {
-  BEAR:   "#ff8a2b",
-  EYE:    "#f3ead9",
-  MOUTH:  "#f3ead9",
-  BG:     "#000000",
-};
+const DEFAULT = { BEAR: "#ff8a2b", EYE: "#f3ead9", MOUTH: "#f3ead9", BG: "#000000" };
+const LCD_W = 320, LCD_H = 240;
 
-// ----- Seed: port of current Atticus face (face_anim.c) -----
 function seedDoc() {
-  const LCD_W = 320, LCD_H = 240;
-  const eye_y  = LCD_H / 2 - 20;
+  const eye_y = LCD_H / 2 - 20;
   const eye_lx = LCD_W / 2 - 60;
   const eye_rx = LCD_W / 2 + 60;
-  const eye_rad = 28, eye_ry = 36;
-  const mouth_cx = LCD_W / 2;
-  const mouth_cy = LCD_H / 2 + 50;
+  const er = 28, ery = 36;
+  const mx = LCD_W / 2, my = LCD_H / 2 + 50;
 
-  const earEl = () => ({ id: uid(), kind: "ellipse", x: 20, y: 20, w: 24, h: 24, color: DEFAULT.BEAR, keyframes: {} });
-  const mouth = (r = 24) => ({ id: uid(), kind: "arc", x: mouth_cx, y: mouth_cy, r: r, thick: 5, start: 0, end: 180, color: DEFAULT.MOUTH, keyframes: {} });
-  const eye = (cx, cy, w, h) => ({ id: uid(), kind: "ellipse", x: cx, y: cy, w: w*2, h: h*2, color: DEFAULT.EYE, keyframes: {} });
-  const closedEye = (cx, cy, w) => ({ id: uid(), kind: "rect", x: cx - w, y: cy - 3, w: w*2, h: 6, color: DEFAULT.EYE, keyframes: {} });
+  const eye = (role, cx, cy, w, h) => ({ id: uid(), role, name: role === "leftEye" ? "Left Eye" : "Right Eye", kind: "ellipse", x: cx, y: cy, w: w*2, h: h*2, color: DEFAULT.EYE, keyframes: {} });
+  const closedEye = (role, cx, cy, w) => ({ id: uid(), role, name: role === "leftEye" ? "Left Eye" : "Right Eye", kind: "rect", x: cx - w, y: cy - 3, w: w*2, h: 6, color: DEFAULT.EYE, keyframes: {} });
+  const mouth = (r = 24) => ({ id: uid(), role: "mouth", name: "Mouth", kind: "arc", x: mx, y: my, r, thick: 5, start: 0, end: 180, color: DEFAULT.MOUTH, keyframes: {} });
 
   return {
-    version: 1,
-    width: LCD_W, height: LCD_H,
-    background: DEFAULT.BG,
+    version: 2, width: LCD_W, height: LCD_H, background: DEFAULT.BG,
     expressions: [
       { id: "neutral", name: "Neutral", duration: 0, elements: [
-        earEl(),
-        eye(eye_lx, eye_y, eye_rad, eye_ry),
-        eye(eye_rx, eye_y, eye_rad, eye_ry),
-        mouth(24),
+        eye("leftEye", eye_lx, eye_y, er, ery), eye("rightEye", eye_rx, eye_y, er, ery), mouth(24)
       ]},
       { id: "happy", name: "Happy", duration: 0, elements: [
-        earEl(),
-        eye(eye_lx, eye_y + 6, eye_rad, eye_ry / 2),
-        eye(eye_rx, eye_y + 6, eye_rad, eye_ry / 2),
-        mouth(36),
+        eye("leftEye", eye_lx, eye_y + 6, er, ery/2), eye("rightEye", eye_rx, eye_y + 6, er, ery/2), mouth(36)
       ]},
       { id: "curious", name: "Curious", duration: 0, elements: [
-        earEl(),
-        eye(eye_lx, eye_y, eye_rad, eye_ry),
-        eye(eye_rx, eye_y, eye_rad + 4, eye_ry + 6),
-        mouth(24),
+        eye("leftEye", eye_lx, eye_y, er, ery), eye("rightEye", eye_rx, eye_y, er+4, ery+6), mouth(24)
       ]},
       { id: "thinking", name: "Thinking", duration: 0, elements: [
-        earEl(),
-        eye(eye_lx + 6, eye_y - 4, eye_rad, eye_ry),
-        eye(eye_rx + 6, eye_y - 4, eye_rad, eye_ry),
-        mouth(24),
+        eye("leftEye", eye_lx + 6, eye_y - 4, er, ery), eye("rightEye", eye_rx + 6, eye_y - 4, er, ery), mouth(24)
       ]},
       { id: "listening", name: "Listening", duration: 0, elements: [
-        earEl(),
-        eye(eye_lx, eye_y + 2, eye_rad, eye_ry),
-        eye(eye_rx, eye_y + 2, eye_rad, eye_ry),
-        mouth(24),
+        eye("leftEye", eye_lx, eye_y + 2, er, ery), eye("rightEye", eye_rx, eye_y + 2, er, ery), mouth(24)
       ]},
       { id: "sleeping", name: "Sleeping", duration: 0, elements: [
-        earEl(),
-        closedEye(eye_lx, eye_y, eye_rad),
-        closedEye(eye_rx, eye_y, eye_rad),
+        closedEye("leftEye", eye_lx, eye_y, er), closedEye("rightEye", eye_rx, eye_y, er)
       ]},
-      // Bonus: a pre-animated "blink" expression to show keyframes in action.
       (() => {
         const d = 4000;
         const blinkKf = (openH) => [
-          { t: 0,    v: openH },
-          { t: 1800, v: openH },
-          { t: 1900, v: 6 },     // closed
-          { t: 2000, v: openH }, // open again
-          { t: d,    v: openH },
+          { t: 0, v: openH }, { t: 1800, v: openH },
+          { t: 1900, v: 6 }, { t: 2000, v: openH }, { t: d, v: openH },
         ];
-        return { id: "blinking", name: "Blinking (anim)", duration: d, elements: [
-          earEl(),
-          { id: uid(), kind: "ellipse", x: eye_lx, y: eye_y, w: eye_rad*2, h: eye_ry*2, color: DEFAULT.EYE, keyframes: { h: blinkKf(eye_ry*2) } },
-          { id: uid(), kind: "ellipse", x: eye_rx, y: eye_y, w: eye_rad*2, h: eye_ry*2, color: DEFAULT.EYE, keyframes: { h: blinkKf(eye_ry*2) } },
+        return { id: "blinking", name: "Blinking", duration: d, elements: [
+          { id: uid(), role: "leftEye", name: "Left Eye", kind: "ellipse", x: eye_lx, y: eye_y, w: er*2, h: ery*2, color: DEFAULT.EYE, keyframes: { h: blinkKf(ery*2) } },
+          { id: uid(), role: "rightEye", name: "Right Eye", kind: "ellipse", x: eye_rx, y: eye_y, w: er*2, h: ery*2, color: DEFAULT.EYE, keyframes: { h: blinkKf(ery*2) } },
           mouth(24),
         ]};
       })(),
@@ -426,336 +654,123 @@ function seedDoc() {
 let doc = seedDoc();
 let activeExprId = doc.expressions[0].id;
 let activeElemId = null;
-let playing = false;
-let playStart = 0;
-let playT = 0;
-let drag = null;     // { dx, dy }
+let playing = false, playStart = 0, playT = 0;
+let drag = null;
+let mobileSheetTab = "parts";
+let liveMirror = false;
+let liveCfg = null;
+const STORAGE_KEY = "atticus-face-studio-v2";
 
-/* ----- helpers ----- */
 function uid() { return Math.random().toString(36).slice(2, 10); }
-function $(sel) { return document.querySelector(sel); }
-function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
+function $(s) { return document.querySelector(s); }
+function $$(s) { return Array.from(document.querySelectorAll(s)); }
 function activeExpr() { return doc.expressions.find(e => e.id === activeExprId); }
 function activeElem() { return activeExpr()?.elements.find(e => e.id === activeElemId); }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
-/* ----- Animation interpolation ----- */
-function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
-function easings(name) { return name === "easeInOut" ? easeInOut : (t) => t; }
-
+function easeInOut(t) { return t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2; }
 function sampleProp(elem, prop, t) {
   const track = elem.keyframes && elem.keyframes[prop];
   if (!track || track.length === 0) return elem[prop];
   if (track.length === 1) return track[0].v;
-  // Find segment
   let i = 0;
-  while (i < track.length - 1 && track[i + 1].t <= t) i++;
+  while (i < track.length - 1 && track[i+1].t <= t) i++;
   if (i >= track.length - 1) return track[track.length - 1].v;
-  const a = track[i], b = track[i + 1];
+  const a = track[i], b = track[i+1];
   if (b.t === a.t) return b.v;
   const u = (t - a.t) / (b.t - a.t);
-  const eased = easings(a.easing)(u);
   if (typeof a.v === "string") return u < 0.5 ? a.v : b.v;
-  return a.v + (b.v - a.v) * eased;
+  return a.v + (b.v - a.v) * (a.easing === "easeInOut" ? easeInOut(u) : u);
 }
-
 function elemAt(elem, t) {
-  // Return a flat object with current sampled values.
   const out = { ...elem };
-  for (const prop of Object.keys(elem.keyframes || {})) {
-    out[prop] = sampleProp(elem, prop, t);
-  }
+  for (const p of Object.keys(elem.keyframes || {})) out[p] = sampleProp(elem, p, t);
   return out;
 }
 
-/* ----- Rendering (mirrors firmware face_anim.c primitives) ----- */
-const stage = document.getElementById('stage');
+const stage = $('#stage');
 const ctx = stage.getContext('2d');
+const stageHost = $('#stageHost');
+const stageBox = $('#stageBox');
 
-function drawDoc(t = 0) {
-  const expr = activeExpr();
-  ctx.fillStyle = doc.background;
-  ctx.fillRect(0, 0, stage.width, stage.height);
+function fitStage() {
+  const rect = stageHost.getBoundingClientRect();
+  const availW = rect.width - 8;
+  const availH = rect.height - 8;
+  const ar = LCD_W / LCD_H;
+  let w = availW, h = w / ar;
+  if (h > availH) { h = availH; w = h * ar; }
+  w = Math.max(160, Math.floor(w));
+  h = Math.max(120, Math.floor(h));
+  stageBox.style.width = w + 'px';
+  stageBox.style.height = h + 'px';
+}
+
+function drawDocOn(targetCtx, w, h, expr, t, opts = {}) {
+  const sx = w / LCD_W, sy = h / LCD_H;
+  targetCtx.fillStyle = doc.background;
+  targetCtx.fillRect(0, 0, w, h);
   if (!expr) return;
   for (const el of expr.elements) {
     const e = elemAt(el, t);
-    ctx.fillStyle = e.color;
+    targetCtx.fillStyle = e.color;
     if (e.kind === "ellipse") {
-      ctx.beginPath();
-      ctx.ellipse(e.x, e.y, Math.max(1, e.w / 2), Math.max(1, e.h / 2), 0, 0, Math.PI * 2);
-      ctx.fill();
+      targetCtx.beginPath();
+      targetCtx.ellipse(e.x * sx, e.y * sy, Math.max(1, e.w / 2) * sx, Math.max(1, e.h / 2) * sy, 0, 0, Math.PI * 2);
+      targetCtx.fill();
     } else if (e.kind === "rect") {
-      ctx.fillRect(e.x, e.y, e.w, e.h);
+      targetCtx.fillRect(e.x * sx, e.y * sy, e.w * sx, e.h * sy);
     } else if (e.kind === "arc") {
-      const r = Math.max(1, e.r);
-      const thick = Math.max(1, Math.min(e.thick, r));
-      ctx.beginPath();
-      ctx.arc(e.x, e.y, r, e.start * Math.PI / 180, e.end * Math.PI / 180);
-      ctx.arc(e.x, e.y, r - thick, e.end * Math.PI / 180, e.start * Math.PI / 180, true);
-      ctx.closePath();
-      ctx.fill();
+      const r = Math.max(1, e.r), thick = Math.max(1, Math.min(e.thick, r));
+      targetCtx.beginPath();
+      targetCtx.arc(e.x * sx, e.y * sy, r * sx, e.start * Math.PI / 180, e.end * Math.PI / 180);
+      targetCtx.arc(e.x * sx, e.y * sy, (r - thick) * sx, e.end * Math.PI / 180, e.start * Math.PI / 180, true);
+      targetCtx.closePath();
+      targetCtx.fill();
     }
   }
-  // Selection outline
-  if (!playing && activeElemId) {
-    const el = activeElem();
+  if (opts.selectionId && !playing) {
+    const el = expr.elements.find(x => x.id === opts.selectionId);
     if (el) {
       const e = elemAt(el, t);
-      ctx.strokeStyle = "#ff8a2b";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 2]);
+      targetCtx.strokeStyle = "#ff8a2b";
+      targetCtx.lineWidth = 1.5;
+      targetCtx.setLineDash([4, 3]);
       if (e.kind === "ellipse") {
-        ctx.beginPath();
-        ctx.ellipse(e.x, e.y, e.w / 2 + 2, e.h / 2 + 2, 0, 0, Math.PI * 2);
-        ctx.stroke();
+        targetCtx.beginPath();
+        targetCtx.ellipse(e.x * sx, e.y * sy, (e.w / 2 + 4) * sx, (e.h / 2 + 4) * sy, 0, 0, Math.PI * 2);
+        targetCtx.stroke();
       } else if (e.kind === "rect") {
-        ctx.strokeRect(e.x - 1, e.y - 1, e.w + 2, e.h + 2);
+        targetCtx.strokeRect(e.x * sx - 3, e.y * sy - 3, e.w * sx + 6, e.h * sy + 6);
       } else if (e.kind === "arc") {
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, e.r + 2, 0, Math.PI * 2);
-        ctx.stroke();
+        targetCtx.beginPath();
+        targetCtx.arc(e.x * sx, e.y * sy, (e.r + 4) * sx, 0, Math.PI * 2);
+        targetCtx.stroke();
       }
-      ctx.setLineDash([]);
+      targetCtx.setLineDash([]);
     }
   }
 }
 
-/* ----- UI rendering ----- */
-function renderExprList() {
-  const list = $('#exprList');
-  list.innerHTML = '';
-  for (const ex of doc.expressions) {
-    const div = document.createElement('div');
-    div.className = 'expr-tab' + (ex.id === activeExprId ? ' active' : '');
-    const hasAnim = ex.duration > 0 || ex.elements.some(el => Object.keys(el.keyframes || {}).length);
-    div.innerHTML = `<span class="name">${escapeHtml(ex.name)}</span><span class="anim-dot ${hasAnim ? 'has' : ''}" title="${hasAnim ? 'has animation' : 'static'}"></span>`;
-    div.onclick = () => { activeExprId = ex.id; activeElemId = null; renderAll(); };
-    list.appendChild(div);
-  }
+function drawDoc(t = 0) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = stageBox.getBoundingClientRect();
+  const w = Math.max(1, Math.round(rect.width * dpr));
+  const h = Math.max(1, Math.round(rect.height * dpr));
+  if (stage.width !== w || stage.height !== h) { stage.width = w; stage.height = h; }
+  drawDocOn(ctx, w, h, activeExpr(), t, { selectionId: activeElemId });
 }
 
-function renderExprMeta() {
-  const ex = activeExpr();
-  const pane = $('#exprMeta');
-  if (!ex) { pane.innerHTML = ''; return; }
-  pane.innerHTML = `
-    <h3 style="margin: 0 0 10px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim);">Expression</h3>
-    <div class="prop-row"><label>ID</label><input type="text" value="${escapeAttr(ex.id)}" data-meta="id" /></div>
-    <div class="prop-row"><label>Name</label><input type="text" value="${escapeAttr(ex.name)}" data-meta="name" /></div>
-    <div class="prop-row"><label>Loop ms</label><input type="number" min="0" step="100" value="${ex.duration}" data-meta="duration" title="0 = static, >0 = animation loop length" /></div>
-    <div class="prop-row" style="margin-top: 8px;"><label></label><button id="dupExpr" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;">duplicate</button><button id="delExpr" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--red);font-size:12px;">delete</button></div>
-  `;
-  pane.querySelectorAll('[data-meta]').forEach(inp => {
-    inp.oninput = () => {
-      const k = inp.dataset.meta;
-      if (k === 'duration') ex.duration = Math.max(0, parseInt(inp.value, 10) || 0);
-      else ex[k] = inp.value;
-      updateScrub();
-      renderExprList();
-    };
-  });
-  $('#dupExpr').onclick = () => {
-    const copy = JSON.parse(JSON.stringify(ex));
-    copy.id = ex.id + '-copy';
-    copy.name = ex.name + ' copy';
-    copy.elements.forEach(el => el.id = uid());
-    doc.expressions.push(copy);
-    activeExprId = copy.id;
-    renderAll();
-  };
-  $('#delExpr').onclick = () => {
-    if (doc.expressions.length === 1) { alert('Need at least one expression.'); return; }
-    if (!confirm(`Delete expression "${ex.name}"?`)) return;
-    doc.expressions = doc.expressions.filter(e => e.id !== activeExprId);
-    activeExprId = doc.expressions[0].id;
-    activeElemId = null;
-    renderAll();
-  };
-}
-
-function renderElemList() {
-  const ex = activeExpr();
-  const list = $('#elemList');
-  list.innerHTML = '';
-  if (!ex) return;
-  ex.elements.forEach((el, i) => {
-    const div = document.createElement('div');
-    div.className = 'elem-row' + (el.id === activeElemId ? ' active' : '');
-    const hasKf = Object.keys(el.keyframes || {}).length > 0;
-    div.innerHTML = `
-      <span class="swatch" style="background:${el.color};"></span>
-      <span class="label">${el.kind} ${i + 1}</span>
-      ${hasKf ? '<span class="anim-mark" title="animated">◆</span>' : ''}
-      <button class="del" title="delete">×</button>
-    `;
-    div.onclick = (e) => {
-      if (e.target.classList.contains('del')) {
-        ex.elements = ex.elements.filter(x => x.id !== el.id);
-        if (activeElemId === el.id) activeElemId = null;
-        renderAll();
-        return;
-      }
-      activeElemId = el.id;
-      renderAll();
-    };
-    list.appendChild(div);
-  });
-  if (ex.elements.length === 0) {
-    const e = document.createElement('div');
-    e.className = 'empty';
-    e.textContent = 'No elements yet. Add one below.';
-    list.appendChild(e);
-  }
-}
-
-function renderProps() {
-  const pane = $('#propsPane');
-  const el = activeElem();
-  if (!el) { pane.innerHTML = '<div class="empty">Select an element to edit its properties.</div>'; return; }
-
-  const propsByKind = {
-    ellipse: ['x', 'y', 'w', 'h', 'color'],
-    rect:    ['x', 'y', 'w', 'h', 'color'],
-    arc:     ['x', 'y', 'r', 'thick', 'start', 'end', 'color'],
-  };
-  const props = propsByKind[el.kind];
-
-  let html = `<div class="group"><h3>${el.kind} properties</h3>`;
-  for (const p of props) {
-    const isColor = p === 'color';
-    const hasKf = el.keyframes && el.keyframes[p] && el.keyframes[p].length > 0;
-    const val = el[p] ?? (isColor ? '#ffffff' : 0);
-    html += `<div class="prop-row">
-      <label>${p}</label>
-      ${isColor
-        ? `<input type="color" value="${val}" data-prop="${p}" />`
-        : `<input type="number" step="1" value="${val}" data-prop="${p}" />`}
-      <button class="key ${hasKf ? 'has' : ''}" data-kf="${p}" title="${hasKf ? 'has keyframes' : 'add keyframe at current time'}">${hasKf ? '◆' : '◇'}</button>
-    </div>`;
-  }
-  html += `</div>`;
-
-  // Keyframe editor for current property tracks
-  const tracks = Object.keys(el.keyframes || {}).filter(k => el.keyframes[k].length > 0);
-  if (tracks.length) {
-    html += `<div class="group"><h3>keyframes</h3>`;
-    for (const k of tracks) {
-      html += `<div style="margin-bottom:10px;">
-        <div style="font-size:12px; color: var(--orange); margin-bottom:4px; display:flex; justify-content:space-between;">
-          <span>${k}</span>
-          <button data-clearkf="${k}" style="background:transparent;border:0;color:var(--dim);font-size:11px;cursor:pointer;">clear</button>
-        </div>`;
-      for (let i = 0; i < el.keyframes[k].length; i++) {
-        const kf = el.keyframes[k][i];
-        html += `<div class="kf-row">
-          <span class="t">${(kf.t/1000).toFixed(2)}s</span>
-          <input type="${typeof kf.v === 'string' ? 'color' : 'number'}" value="${kf.v}" data-kfedit-prop="${k}" data-kfedit-idx="${i}" />
-          <button data-kfdel-prop="${k}" data-kfdel-idx="${i}">×</button>
-        </div>`;
-      }
-      html += `</div>`;
-    }
-    html += `</div>`;
-  }
-
-  pane.innerHTML = html;
-
-  // Bind value inputs
-  pane.querySelectorAll('[data-prop]').forEach(inp => {
-    inp.oninput = () => {
-      const p = inp.dataset.prop;
-      el[p] = inp.type === 'color' ? inp.value : parseFloat(inp.value);
-      renderElemList();
-      drawDoc(playT);
-    };
-  });
-  // Bind keyframe buttons (add keyframe at current time)
-  pane.querySelectorAll('[data-kf]').forEach(btn => {
-    btn.onclick = () => {
-      const p = btn.dataset.kf;
-      el.keyframes = el.keyframes || {};
-      el.keyframes[p] = el.keyframes[p] || [];
-      const t = playT;
-      // Replace existing keyframe at this time, otherwise insert
-      const existing = el.keyframes[p].findIndex(k => k.t === t);
-      const v = el[p];
-      if (existing >= 0) el.keyframes[p][existing].v = v;
-      else el.keyframes[p].push({ t, v });
-      el.keyframes[p].sort((a, b) => a.t - b.t);
-      if (!activeExpr().duration) activeExpr().duration = 2000;
-      renderAll();
-    };
-  });
-  pane.querySelectorAll('[data-kfedit-prop]').forEach(inp => {
-    inp.oninput = () => {
-      const p = inp.dataset.kfeditProp;
-      const i = parseInt(inp.dataset.kfeditIdx, 10);
-      el.keyframes[p][i].v = inp.type === 'color' ? inp.value : parseFloat(inp.value);
-      drawDoc(playT);
-      renderElemList();
-    };
-  });
-  pane.querySelectorAll('[data-kfdel-prop]').forEach(btn => {
-    btn.onclick = () => {
-      const p = btn.dataset.kfdelProp;
-      const i = parseInt(btn.dataset.kfdelIdx, 10);
-      el.keyframes[p].splice(i, 1);
-      if (el.keyframes[p].length === 0) delete el.keyframes[p];
-      renderAll();
-    };
-  });
-  pane.querySelectorAll('[data-clearkf]').forEach(btn => {
-    btn.onclick = () => {
-      const p = btn.dataset.clearkf;
-      delete el.keyframes[p];
-      renderAll();
-    };
-  });
-}
-
-function updateScrub() {
-  const ex = activeExpr();
-  const d = ex?.duration || 0;
-  const scrub = $('#scrub');
-  scrub.max = Math.max(d, 100);
-  scrub.disabled = d === 0;
-  $('#playTime').textContent = (playT / 1000).toFixed(2) + 's';
-  scrub.value = playT;
-}
-
-function renderAll() {
-  renderExprList();
-  renderExprMeta();
-  renderElemList();
-  renderProps();
-  updateScrub();
-  drawDoc(playT);
-}
-
-/* ----- Canvas interaction ----- */
-function canvasPoint(ev) {
+/* ---- pointer / hit-test ---- */
+function eventToLcd(ev) {
   const rect = stage.getBoundingClientRect();
-  return {
-    x: (ev.clientX - rect.left) / rect.width * stage.width,
-    y: (ev.clientY - rect.top)  / rect.height * stage.height,
-  };
+  const cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+  const cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - rect.top;
+  return { x: cx / rect.width * LCD_W, y: cy / rect.height * LCD_H };
 }
-stage.addEventListener('mousemove', ev => {
-  const p = canvasPoint(ev);
-  $('#curPos').textContent = `${Math.round(p.x)}, ${Math.round(p.y)}`;
-  if (drag && activeElem() && !playing) {
-    const el = activeElem();
-    el.x = Math.round(p.x - drag.dx);
-    el.y = Math.round(p.y - drag.dy);
-    drawDoc(playT);
-    renderProps();
-  }
-});
-stage.addEventListener('mousedown', ev => {
-  if (playing) return;
-  const p = canvasPoint(ev);
-  // Pick topmost element under cursor
-  const ex = activeExpr();
-  if (!ex) return;
+function hitTest(p) {
+  const ex = activeExpr(); if (!ex) return null;
   for (let i = ex.elements.length - 1; i >= 0; i--) {
     const el = ex.elements[i];
     const e = elemAt(el, playT);
@@ -768,135 +783,392 @@ stage.addEventListener('mousedown', ev => {
       hit = p.x >= e.x && p.x <= e.x + e.w && p.y >= e.y && p.y <= e.y + e.h;
     } else if (e.kind === 'arc') {
       const d = Math.hypot(p.x - e.x, p.y - e.y);
-      hit = d <= e.r + 4;
+      hit = d <= e.r + 8;
     }
-    if (hit) {
-      activeElemId = el.id;
-      drag = { dx: p.x - el.x, dy: p.y - el.y };
-      renderAll();
-      return;
-    }
+    if (hit) return el;
   }
-});
-window.addEventListener('mouseup', () => { drag = null; });
+  return null;
+}
+function onPointerDown(ev) {
+  if (playing) return;
+  ev.preventDefault();
+  const p = eventToLcd(ev);
+  const el = hitTest(p);
+  if (el) { activeElemId = el.id; drag = { dx: p.x - el.x, dy: p.y - el.y }; }
+  else { activeElemId = null; drag = null; }
+  renderAll();
+}
+function onPointerMove(ev) {
+  const p = eventToLcd(ev);
+  $('#metaCur').textContent = `${Math.round(p.x)}, ${Math.round(p.y)}`;
+  if (drag && activeElem() && !playing) {
+    ev.preventDefault();
+    const el = activeElem();
+    el.x = Math.round(p.x - drag.dx);
+    el.y = Math.round(p.y - drag.dy);
+    drawDoc(playT); renderInspectors(); pushLive();
+  }
+}
+function onPointerUp() { drag = null; }
+stage.addEventListener('mousedown', onPointerDown);
+stage.addEventListener('mousemove', onPointerMove);
+window.addEventListener('mouseup', onPointerUp);
+stage.addEventListener('touchstart', onPointerDown, { passive: false });
+stage.addEventListener('touchmove', onPointerMove, { passive: false });
+window.addEventListener('touchend', onPointerUp);
+
 window.addEventListener('keydown', ev => {
   if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
-  const el = activeElem();
-  if (!el) return;
+  const el = activeElem(); if (!el) return;
   const step = ev.shiftKey ? 10 : 1;
-  if (ev.key === 'ArrowLeft')  { el.x -= step; ev.preventDefault(); }
-  else if (ev.key === 'ArrowRight') { el.x += step; ev.preventDefault(); }
-  else if (ev.key === 'ArrowUp')    { el.y -= step; ev.preventDefault(); }
-  else if (ev.key === 'ArrowDown')  { el.y += step; ev.preventDefault(); }
+  let handled = true;
+  if (ev.key === 'ArrowLeft') el.x -= step;
+  else if (ev.key === 'ArrowRight') el.x += step;
+  else if (ev.key === 'ArrowUp') el.y -= step;
+  else if (ev.key === 'ArrowDown') el.y += step;
   else if (ev.key === 'Delete' || ev.key === 'Backspace') {
     activeExpr().elements = activeExpr().elements.filter(e => e.id !== el.id);
     activeElemId = null;
-    ev.preventDefault();
-  } else return;
-  renderAll();
+  } else handled = false;
+  if (handled) { ev.preventDefault(); renderAll(); pushLive(); }
 });
 
-/* ----- Play / scrub ----- */
-function tick(now) {
-  if (!playing) return;
+/* ---- expression card ---- */
+function renderExprCard(ex, host, opts = {}) {
+  const card = document.createElement('div');
+  card.className = 'expr' + (ex.id === activeExprId ? ' active' : '');
+  const thumb = document.createElement('canvas');
+  thumb.width = opts.mobile ? 160 : 120;
+  thumb.height = opts.mobile ? 120 : 90;
+  drawDocOn(thumb.getContext('2d'), thumb.width, thumb.height, ex, 0, {});
+  card.appendChild(thumb);
+  const info = document.createElement('div'); info.className = 'info';
+  const hasAnim = ex.duration > 0 && ex.elements.some(el => Object.keys(el.keyframes || {}).length);
+  info.innerHTML = `<div class="name">${escapeHtml(ex.name)}</div><div class="meta">${ex.elements.length} parts${hasAnim ? ' · <span class="ani">anim</span>' : ''}</div>`;
+  card.appendChild(info);
+  card.onclick = () => { activeExprId = ex.id; activeElemId = null; playT = 0; playing = false; $('#btnPlay').textContent = '▶'; renderAll(); };
+  host.appendChild(card);
+}
+function renderStripDesktop() {
+  $('#exprCount').textContent = String(doc.expressions.length).padStart(2, '0');
+  const host = $('#exprStripDesktop'); host.innerHTML = '';
+  for (const ex of doc.expressions) renderExprCard(ex, host);
+}
+function renderExprStripMobile(host) {
+  const strip = document.createElement('div'); strip.className = 'expr-strip-mobile';
+  for (const ex of doc.expressions) renderExprCard(ex, strip, { mobile: true });
+  const add = document.createElement('div'); add.className = 'expr-add'; add.textContent = '+ new';
+  add.onclick = addExpression;
+  strip.appendChild(add);
+  host.appendChild(strip);
+}
+function addExpression() {
+  const id = prompt('Expression id (lowercase, no spaces):', 'new_expr');
+  if (!id) return;
+  if (doc.expressions.find(e => e.id === id)) return alert('id exists');
+  doc.expressions.push({ id, name: id, duration: 0, elements: [] });
+  activeExprId = id; activeElemId = null; renderAll();
+}
+$('#addExprDesktop').onclick = addExpression;
+
+/* ---- parts panel ---- */
+function renderPartsPanel(host) {
+  const ex = activeExpr(); if (!ex) return;
+  const block = document.createElement('div'); block.className = 'group';
+  block.innerHTML = `<div class="group-head"><span class="label">Parts</span><span class="sub"><em>${escapeHtml(ex.name)}</em></span></div>`;
+  const grid = document.createElement('div'); grid.className = 'parts-grid';
+  if (ex.elements.length === 0) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;"><em>Empty face</em><br>Add a part below to start.</div>';
+  } else {
+    for (const el of ex.elements) {
+      const chip = document.createElement('div');
+      chip.className = 'part' + (el.id === activeElemId ? ' active' : '');
+      const hasKf = Object.keys(el.keyframes || {}).length > 0;
+      chip.innerHTML = `<span class="swatch" style="background:${el.color};"></span><span class="nm">${escapeHtml(el.name || el.kind)}</span>${hasKf ? '<span class="anim">◆</span>' : ''}<button class="del" title="delete">×</button>`;
+      chip.onclick = (e) => {
+        if (e.target.classList.contains('del')) {
+          ex.elements = ex.elements.filter(x => x.id !== el.id);
+          if (activeElemId === el.id) activeElemId = null;
+          renderAll(); pushLive(); return;
+        }
+        activeElemId = el.id; renderAll();
+      };
+      grid.appendChild(chip);
+    }
+  }
+  block.appendChild(grid);
+  const add = document.createElement('div'); add.className = 'add-row';
+  for (const k of ['ellipse', 'rect', 'arc']) {
+    const b = document.createElement('button'); b.textContent = '+ ' + k;
+    b.onclick = () => addElement(k); add.appendChild(b);
+  }
+  block.appendChild(add);
+  host.appendChild(block);
+}
+function addElement(kind) {
+  const ex = activeExpr(); if (!ex) return;
+  const base = { id: uid(), role: kind, name: capitalize(kind), kind, color: DEFAULT.EYE, keyframes: {} };
+  if (kind === 'ellipse') Object.assign(base, { x: 160, y: 120, w: 40, h: 40 });
+  else if (kind === 'rect') Object.assign(base, { x: 140, y: 110, w: 40, h: 20 });
+  else if (kind === 'arc') Object.assign(base, { x: 160, y: 170, r: 30, thick: 5, start: 0, end: 180 });
+  ex.elements.push(base); activeElemId = base.id;
+  renderAll(); pushLive();
+}
+
+/* ---- properties panel ---- */
+function renderPropsPanel(host) {
+  const el = activeElem();
+  const block = document.createElement('div'); block.className = 'group';
+  if (!el) {
+    block.innerHTML = '<div class="group-head"><span class="label">Properties</span></div><div class="empty"><em>Tap a part</em><br>on the canvas or in the list to edit it.</div>';
+    host.appendChild(block); return;
+  }
+  block.innerHTML = `<div class="group-head"><span class="label">Properties</span><span class="sub"><em>${escapeHtml(el.name || el.kind)}</em></span></div>`;
+
+  const nameRow = document.createElement('div'); nameRow.className = 'meta-row';
+  nameRow.innerHTML = `<label>Name</label><input type="text" value="${escapeHtml(el.name || '')}" />`;
+  nameRow.querySelector('input').oninput = (e) => { el.name = e.target.value; renderInspectors(); renderStripDesktop(); };
+  block.appendChild(nameRow);
+
+  const propsByKind = {
+    ellipse: [['x',0,LCD_W],['y',0,LCD_H],['w',2,LCD_W*2],['h',2,LCD_H*2]],
+    rect:    [['x',0,LCD_W],['y',0,LCD_H],['w',2,LCD_W],['h',2,LCD_H]],
+    arc:     [['x',0,LCD_W],['y',0,LCD_H],['r',2,200],['thick',1,40],['start',-360,360],['end',-360,360]],
+  };
+  for (const [p, lo, hi] of propsByKind[el.kind] || []) {
+    const row = document.createElement('div'); row.className = 'slider';
+    const v = Math.round(el[p] ?? 0);
+    const hasKf = el.keyframes && el.keyframes[p] && el.keyframes[p].length > 0;
+    row.innerHTML = `
+      <label>${p}</label>
+      <input type="range" min="${lo}" max="${hi}" step="1" value="${v}" />
+      <span class="val">${v}</span>
+      <button class="key ${hasKf ? 'has' : ''}" title="${hasKf ? 'has keyframes' : 'set keyframe at playhead'}">${hasKf ? '◆' : '◇'}</button>
+    `;
+    const range = row.querySelector('input[type=range]');
+    const valSpan = row.querySelector('.val');
+    range.oninput = () => {
+      const nv = parseFloat(range.value);
+      el[p] = nv; valSpan.textContent = nv;
+      drawDoc(playT); renderStripDesktop(); pushLive();
+    };
+    row.querySelector('.key').onclick = () => toggleKf(el, p);
+    block.appendChild(row);
+  }
+
+  const colorRow = document.createElement('div'); colorRow.className = 'prop';
+  const hasColorKf = el.keyframes && el.keyframes.color && el.keyframes.color.length > 0;
+  colorRow.innerHTML = `<label>color</label><input type="color" value="${el.color || '#ffffff'}" /><button class="key ${hasColorKf ? 'has' : ''}" title="${hasColorKf ? 'has color keyframes' : 'set color keyframe'}">${hasColorKf ? '◆' : '◇'}</button>`;
+  colorRow.querySelector('input[type=color]').oninput = (e) => { el.color = e.target.value; drawDoc(playT); renderInspectors(); renderStripDesktop(); pushLive(); };
+  colorRow.querySelector('.key').onclick = () => toggleKf(el, 'color');
+  block.appendChild(colorRow);
+
+  const tracks = Object.keys(el.keyframes || {}).filter(k => el.keyframes[k].length > 0);
+  if (tracks.length) {
+    const kfb = document.createElement('div'); kfb.className = 'keyframes-block';
+    for (const k of tracks) {
+      const head = document.createElement('div'); head.className = 'kf-head';
+      head.innerHTML = `<span>◆ ${k}</span><button>clear track</button>`;
+      head.querySelector('button').onclick = () => { delete el.keyframes[k]; renderAll(); pushLive(); };
+      kfb.appendChild(head);
+      el.keyframes[k].forEach((kf, i) => {
+        const r = document.createElement('div'); r.className = 'kf-row';
+        const isColor = typeof kf.v === 'string';
+        r.innerHTML = `<span class="t">${(kf.t/1000).toFixed(2)}s</span><input type="${isColor ? 'color' : 'number'}" value="${kf.v}" /><button>×</button>`;
+        r.querySelector('input').oninput = (e) => { kf.v = isColor ? e.target.value : parseFloat(e.target.value); drawDoc(playT); renderStripDesktop(); pushLive(); };
+        r.querySelector('button').onclick = () => { el.keyframes[k].splice(i, 1); if (!el.keyframes[k].length) delete el.keyframes[k]; renderAll(); pushLive(); };
+        kfb.appendChild(r);
+      });
+    }
+    block.appendChild(kfb);
+  }
+  host.appendChild(block);
+}
+function toggleKf(el, p) {
+  el.keyframes = el.keyframes || {};
+  el.keyframes[p] = el.keyframes[p] || [];
+  const t = playT;
+  const i = el.keyframes[p].findIndex(k => k.t === t);
+  if (i >= 0) el.keyframes[p][i].v = el[p];
+  else el.keyframes[p].push({ t, v: el[p] });
+  el.keyframes[p].sort((a, b) => a.t - b.t);
+  if (!activeExpr().duration) activeExpr().duration = 2000;
+  renderAll(); pushLive();
+}
+
+/* ---- expression meta panel ---- */
+function renderExprMetaPanel(host) {
+  const ex = activeExpr(); if (!ex) return;
+  const block = document.createElement('div'); block.className = 'group';
+  block.innerHTML = `<div class="group-head"><span class="label">Expression</span><span class="sub"><em>${escapeHtml(ex.name)}</em></span></div>`;
+  const fields = [['id', 'text'], ['name', 'text'], ['duration', 'number']];
+  for (const [k, type] of fields) {
+    const row = document.createElement('div'); row.className = 'meta-row';
+    row.innerHTML = `<label>${k === 'duration' ? 'Loop ms' : k}</label><input type="${type}" ${type === 'number' ? 'min="0" step="100"' : ''} value="${escapeHtml(String(ex[k]))}" />`;
+    row.querySelector('input').oninput = (e) => {
+      if (type === 'number') ex[k] = Math.max(0, parseInt(e.target.value, 10) || 0);
+      else ex[k] = e.target.value;
+      if (k === 'id') activeExprId = ex.id;
+      updateScrub(); renderStripDesktop();
+    };
+    block.appendChild(row);
+  }
+  const btns = document.createElement('div'); btns.className = 'row-btns';
+  const dup = document.createElement('button'); dup.textContent = 'Duplicate'; dup.onclick = () => {
+    const c = JSON.parse(JSON.stringify(ex)); c.id = ex.id + '-copy'; c.name = ex.name + ' copy';
+    c.elements.forEach(el => el.id = uid());
+    doc.expressions.push(c); activeExprId = c.id; renderAll();
+  };
+  const del = document.createElement('button'); del.textContent = 'Delete'; del.className = 'danger';
+  del.onclick = () => {
+    if (doc.expressions.length === 1) return alert('Need at least one expression.');
+    if (!confirm(`Delete "${ex.name}"?`)) return;
+    doc.expressions = doc.expressions.filter(e => e.id !== activeExprId);
+    activeExprId = doc.expressions[0].id; activeElemId = null; renderAll();
+  };
+  btns.appendChild(dup); btns.appendChild(del);
+  block.appendChild(btns);
+  host.appendChild(block);
+}
+
+/* ---- inspector composition ---- */
+function renderInspectorDesktop() {
+  const host = $('#inspectorDesktop'); host.innerHTML = '';
+  renderExprMetaPanel(host);
+  renderPartsPanel(host);
+  renderPropsPanel(host);
+}
+function renderSheet() {
+  const host = $('#sheetBody'); host.innerHTML = '';
+  if (mobileSheetTab === 'parts') { renderPartsPanel(host); renderPropsPanel(host); }
+  else if (mobileSheetTab === 'props') { renderPropsPanel(host); }
+  else if (mobileSheetTab === 'expr') {
+    const block = document.createElement('div'); block.className = 'group';
+    block.innerHTML = '<div class="group-head"><span class="label">Expressions</span></div>';
+    host.appendChild(block); renderExprStripMobile(block);
+    renderExprMetaPanel(host);
+  }
+}
+function renderInspectors() { renderInspectorDesktop(); renderSheet(); }
+
+function updateMeta() {
+  $('#metaExpr').textContent = activeExpr()?.name ?? '—';
+  const el = activeElem();
+  $('#metaSel').textContent = el ? (el.name || el.kind) : 'tap a part';
+}
+function updateScrub() {
   const ex = activeExpr();
   const d = ex?.duration || 0;
-  if (d > 0) {
-    playT = (now - playStart) % d;
-  }
+  const scrub = $('#scrub');
+  scrub.max = Math.max(d, 100); scrub.disabled = d === 0;
+  $('#playTime').textContent = (playT / 1000).toFixed(2) + 's';
+  scrub.value = playT;
+}
+function renderAll() { fitStage(); drawDoc(playT); renderStripDesktop(); renderInspectors(); updateMeta(); updateScrub(); }
+
+/* ---- play / scrub ---- */
+function tick(now) {
+  if (!playing) return;
+  const d = activeExpr()?.duration || 0;
+  if (d > 0) playT = (now - playStart) % d;
   drawDoc(playT);
   $('#playTime').textContent = (playT / 1000).toFixed(2) + 's';
   $('#scrub').value = playT;
+  pushLive();
   requestAnimationFrame(tick);
 }
-
 $('#btnPlay').onclick = () => {
   playing = !playing;
-  $('#btnPlay').textContent = playing ? '⏸ Pause' : '▶ Play';
+  $('#btnPlay').textContent = playing ? '⏸' : '▶';
   if (playing) { playStart = performance.now() - playT; requestAnimationFrame(tick); }
 };
-$('#btnStop').onclick = () => { playing = false; playT = 0; $('#btnPlay').textContent = '▶ Play'; renderAll(); };
+$('#btnStop').onclick = () => { playing = false; playT = 0; $('#btnPlay').textContent = '▶'; renderAll(); };
 $('#scrub').oninput = () => { playT = parseFloat($('#scrub').value); $('#playTime').textContent = (playT / 1000).toFixed(2) + 's'; drawDoc(playT); };
 
-/* ----- Add elements ----- */
-$$('.add-elem [data-add]').forEach(btn => {
-  btn.onclick = () => {
-    const kind = btn.dataset.add;
-    const ex = activeExpr();
-    if (!ex) return;
-    const base = { id: uid(), kind, color: DEFAULT.EYE, keyframes: {} };
-    if (kind === 'ellipse') Object.assign(base, { x: 160, y: 120, w: 40, h: 40 });
-    else if (kind === 'rect') Object.assign(base, { x: 140, y: 110, w: 40, h: 20 });
-    else if (kind === 'arc') Object.assign(base, { x: 160, y: 170, r: 30, thick: 5, start: 0, end: 180 });
-    ex.elements.push(base);
-    activeElemId = base.id;
-    renderAll();
+/* ---- sheet tabs ---- */
+$$('.sheet-tabs button').forEach(b => {
+  b.onclick = () => {
+    mobileSheetTab = b.dataset.sheet;
+    $$('.sheet-tabs button').forEach(x => x.classList.toggle('active', x === b));
+    renderSheet();
   };
 });
 
-$('#addExpr').onclick = () => {
-  const id = prompt('expression id (lowercase, no spaces):', 'new_expr');
-  if (!id) return;
-  if (doc.expressions.find(e => e.id === id)) { alert('id exists'); return; }
-  doc.expressions.push({ id, name: id, duration: 0, elements: [] });
-  activeExprId = id;
-  activeElemId = null;
-  renderAll();
-};
-
-/* ----- Save / Load / Import / Export ----- */
-const STORAGE_KEY = 'atticus-face-doc-v1';
-$('#btnSave').onclick = () => { localStorage.setItem(STORAGE_KEY, JSON.stringify(doc)); flash('saved'); };
+/* ---- save / load / import / export ---- */
+$('#btnSave').onclick = () => { localStorage.setItem(STORAGE_KEY, JSON.stringify(doc)); toast('saved'); };
 $('#btnLoad').onclick = () => {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return alert('Nothing saved.');
-  try { doc = JSON.parse(raw); activeExprId = doc.expressions[0].id; activeElemId = null; renderAll(); flash('loaded'); }
-  catch (e) { alert('Bad saved data: ' + e); }
+  if (!raw) return toast('nothing saved');
+  try { doc = JSON.parse(raw); activeExprId = doc.expressions[0].id; activeElemId = null; renderAll(); toast('loaded'); }
+  catch (e) { toast('load failed'); }
 };
-
-$('#btnImport').onclick = () => openModal('Import JSON', '', (text) => {
+$('#btnImport').onclick = () => openModal('Import JSON', '', text => {
   try {
-    const parsed = JSON.parse(text);
-    if (!parsed.expressions) throw new Error('Missing expressions');
-    doc = parsed;
-    activeExprId = doc.expressions[0].id;
-    activeElemId = null;
-    renderAll();
-    flash('imported');
-    return true;
-  } catch (e) { alert('Import failed: ' + e); return false; }
+    const p = JSON.parse(text);
+    if (!p.expressions) throw new Error('Missing expressions');
+    doc = p; activeExprId = doc.expressions[0].id; activeElemId = null;
+    renderAll(); toast('imported'); return true;
+  } catch (e) { toast('bad json'); return false; }
 });
+$('#btnExportJson').onclick = () => openModal('Face <em>JSON</em>', JSON.stringify(doc, null, 2), null, true);
+$('#btnExportC').onclick = () => openModal('Generated <em>C</em>', generateC(doc), null, true);
 
-$('#btnExportJson').onclick = () => openModal('Face JSON (read-only)', JSON.stringify(doc, null, 2), null, true);
-$('#btnExportC').onclick = () => openModal('C code for face_anim.c', generateC(doc), null, true);
-
-$('#btnPush').onclick = async () => {
-  const url = prompt('Bridge URL (no trailing slash)', 'http://localhost:8770');
+/* ---- Live Mirror ---- */
+$('#btnLiveMirror').onclick = async () => {
+  if (liveMirror) {
+    liveMirror = false; liveCfg = null;
+    $('#btnLiveMirror').classList.remove('on');
+    $('#btnLiveMirror').querySelector('.lbl').textContent = 'Live Mirror';
+    return;
+  }
+  const url = prompt('Bridge URL', liveCfg?.url || 'http://localhost:8770');
   if (!url) return;
-  const token = prompt('Bearer token (paste once; not stored)');
+  const token = prompt('Bearer token', liveCfg?.token || '');
   if (!token) return;
+  liveCfg = { url: url.replace(/\/$/, ''), token };
   try {
-    const res = await fetch(url + '/face', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expression: activeExprId, doc }),
-    });
-    if (res.ok) flash('pushed ✓');
-    else flash('push failed: ' + res.status);
-  } catch (e) { flash('push error: ' + e.message); }
+    const r = await fetch(liveCfg.url + '/healthz');
+    if (!r.ok) throw new Error(r.status);
+    liveMirror = true;
+    $('#btnLiveMirror').classList.add('on');
+    $('#btnLiveMirror').querySelector('.lbl').textContent = 'Live · ' + new URL(liveCfg.url).host;
+    pushLive(); toast('connected');
+  } catch (e) { toast('connect failed'); liveCfg = null; }
 };
-
-function flash(msg) {
-  const b = document.createElement('div');
-  b.textContent = msg;
-  b.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--orange);color:#1a1208;padding:8px 16px;border-radius:6px;font-weight:600;z-index:1000;box-shadow:0 4px 12px #0008;';
-  document.body.appendChild(b);
-  setTimeout(() => b.remove(), 1500);
+let pushBusy = false, pushPending = false;
+async function pushLive() {
+  if (!liveMirror || !liveCfg) return;
+  if (pushBusy) { pushPending = true; return; }
+  pushBusy = true;
+  try {
+    await fetch(liveCfg.url + '/face', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + liveCfg.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expression: activeExprId, t: playT, doc }),
+    });
+  } catch (e) {}
+  pushBusy = false;
+  if (pushPending) { pushPending = false; pushLive(); }
 }
 
-/* ----- C code generator ----- */
+/* ---- modal + toast ---- */
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 1600);
+}
+function openModal(title, body, onApply, readOnly = false) {
+  const bg = document.createElement('div'); bg.className = 'modal-bg';
+  bg.innerHTML = `<div class="modal"><h2>${title}</h2><textarea ${readOnly ? 'readonly' : ''}>${escapeHtml(body)}</textarea><div class="modal-actions"><button data-act="close">Close</button>${readOnly ? '<button data-act="copy" class="primary">Copy</button>' : '<button data-act="apply" class="primary">Apply</button>'}</div></div>`;
+  document.body.appendChild(bg);
+  bg.querySelector('[data-act="close"]').onclick = () => bg.remove();
+  bg.addEventListener('click', (e) => { if (e.target === bg) bg.remove(); });
+  if (readOnly) bg.querySelector('[data-act="copy"]').onclick = async () => { await navigator.clipboard.writeText(bg.querySelector('textarea').value); toast('copied'); };
+  else bg.querySelector('[data-act="apply"]').onclick = () => { if (onApply(bg.querySelector('textarea').value)) bg.remove(); };
+}
+
+/* ---- C generator ---- */
 function generateC(doc) {
-  let s = '/* Auto-generated by atticus-face-editor. Drop into face_anim.c. */\n\n';
+  let s = '/* Auto-generated by atticus-face-studio. Drop into face_anim.c. */\n\n';
   s += 'typedef enum {\n';
   doc.expressions.forEach((ex, i) => { s += `    FACE_${ex.id.toUpperCase().replace(/[^A-Z0-9]/g, '_')} = ${i},\n`; });
   s += '} face_expression_t;\n\n';
@@ -905,42 +1177,37 @@ function generateC(doc) {
   s += '    switch (expr) {\n';
   for (const ex of doc.expressions) {
     s += `    case FACE_${ex.id.toUpperCase().replace(/[^A-Z0-9]/g, '_')}: {\n`;
-    if (ex.duration > 0) {
-      s += `        uint32_t t = t_ms % ${ex.duration}u;\n`;
-    } else {
-      s += `        (void)t_ms;\n`;
-    }
+    s += ex.duration > 0 ? `        uint32_t t = t_ms % ${ex.duration}u;\n` : `        (void)t_ms;\n`;
     for (const el of ex.elements) {
       const ec = el.color.replace('#', '');
-      const r = parseInt(ec.slice(0, 2), 16), g = parseInt(ec.slice(2, 4), 16), b = parseInt(ec.slice(4, 6), 16);
+      const r = parseInt(ec.slice(0,2),16), g = parseInt(ec.slice(2,4),16), b = parseInt(ec.slice(4,6),16);
       const rgb565 = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
-      const hex565 = '0x' + rgb565.toString(16).padStart(4, '0').toUpperCase();
+      const hex = '0x' + rgb565.toString(16).padStart(4,'0').toUpperCase();
       const sample = (p) => {
         if (el.keyframes && el.keyframes[p] && el.keyframes[p].length) {
-          // Inline a small interpolator. Better: emit a helper. For brevity, hardcode lerp between 2 nearest.
           const track = el.keyframes[p];
-          let lines = `        int ${p}_val;\n`;
-          lines += `        {\n`;
-          lines += `            uint32_t kt[] = {${track.map(k => k.t).join(', ')}};\n`;
-          lines += `            int kv[] = {${track.map(k => Math.round(k.v)).join(', ')}};\n`;
+          let lines = '';
+          lines += `        int ${p}_val;\n        {\n`;
+          lines += `            uint32_t kt[] = {${track.map(k=>k.t).join(', ')}};\n`;
+          lines += `            int kv[] = {${track.map(k=>Math.round(k.v)).join(', ')}};\n`;
           lines += `            int n = ${track.length}; int i = 0;\n`;
-          lines += `            while (i < n - 1 && kt[i + 1] <= t) i++;\n`;
-          lines += `            if (i >= n - 1) ${p}_val = kv[n - 1];\n`;
-          lines += `            else { uint32_t a = kt[i], b = kt[i + 1]; int u = (int)((t - a) * 1000 / (b - a)); ${p}_val = kv[i] + (kv[i + 1] - kv[i]) * u / 1000; }\n`;
+          lines += `            while (i < n-1 && kt[i+1] <= t) i++;\n`;
+          lines += `            if (i >= n-1) ${p}_val = kv[n-1];\n`;
+          lines += `            else { uint32_t a=kt[i], b=kt[i+1]; int u = (int)((t-a)*1000/(b-a)); ${p}_val = kv[i] + (kv[i+1]-kv[i])*u/1000; }\n`;
           lines += `        }\n`;
           return { decl: lines, ref: `${p}_val` };
         }
         return { decl: '', ref: String(Math.round(el[p])) };
       };
       if (el.kind === 'ellipse') {
-        const X = sample('x'), Y = sample('y'), W = sample('w'), H = sample('h');
-        s += `        {\n${X.decl}${Y.decl}${W.decl}${H.decl}            fill_ellipse(${X.ref}, ${Y.ref}, ${W.ref}/2, ${H.ref}/2, ${hex565});\n        }\n`;
+        const X=sample('x'),Y=sample('y'),W=sample('w'),H=sample('h');
+        s += `        {\n${X.decl}${Y.decl}${W.decl}${H.decl}            fill_ellipse(${X.ref}, ${Y.ref}, ${W.ref}/2, ${H.ref}/2, ${hex});\n        }\n`;
       } else if (el.kind === 'rect') {
-        const X = sample('x'), Y = sample('y'), W = sample('w'), H = sample('h');
-        s += `        {\n${X.decl}${Y.decl}${W.decl}${H.decl}            fill_rect(${X.ref}, ${Y.ref}, ${W.ref}, ${H.ref}, ${hex565});\n        }\n`;
+        const X=sample('x'),Y=sample('y'),W=sample('w'),H=sample('h');
+        s += `        {\n${X.decl}${Y.decl}${W.decl}${H.decl}            fill_rect(${X.ref}, ${Y.ref}, ${W.ref}, ${H.ref}, ${hex});\n        }\n`;
       } else if (el.kind === 'arc') {
-        const X = sample('x'), Y = sample('y'), R = sample('r'), T = sample('thick');
-        s += `        {\n${X.decl}${Y.decl}${R.decl}${T.decl}            draw_mouth_arc(${X.ref}, ${Y.ref}, ${R.ref}, ${T.ref}, ${hex565});\n        }\n`;
+        const X=sample('x'),Y=sample('y'),R=sample('r'),T=sample('thick');
+        s += `        {\n${X.decl}${Y.decl}${R.decl}${T.decl}            draw_mouth_arc(${X.ref}, ${Y.ref}, ${R.ref}, ${T.ref}, ${hex});\n        }\n`;
       }
     }
     s += '        break;\n    }\n';
@@ -949,105 +1216,11 @@ function generateC(doc) {
   return s;
 }
 
-/* ----- Modal ----- */
-function openModal(title, body, onApply, readOnly = false) {
-  const bg = document.createElement('div');
-  bg.className = 'modal-bg';
-  bg.innerHTML = `
-    <div class="modal">
-      <h2>${escapeHtml(title)}</h2>
-      <textarea ${readOnly ? 'readonly' : ''}>${escapeHtml(body)}</textarea>
-      <div class="modal-actions">
-        <button data-act="close">Close</button>
-        ${readOnly ? '<button data-act="copy" class="primary">Copy</button>' : '<button data-act="apply" class="primary">Apply</button>'}
-      </div>
-    </div>`;
-  document.body.appendChild(bg);
-  bg.querySelector('[data-act="close"]').onclick = () => bg.remove();
-  if (readOnly) {
-    bg.querySelector('[data-act="copy"]').onclick = async () => {
-      await navigator.clipboard.writeText(bg.querySelector('textarea').value);
-      flash('copied');
-    };
-  } else {
-    bg.querySelector('[data-act="apply"]').onclick = () => {
-      if (onApply(bg.querySelector('textarea').value)) bg.remove();
-    };
-  }
-}
-
-/* ----- Utils ----- */
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
-function escapeAttr(s) { return escapeHtml(s); }
-
-/* ----- Mobile tabs ----- */
-const app = document.querySelector('.app');
-document.querySelectorAll('#mobileTabs button').forEach(btn => {
-  btn.onclick = () => {
-    const t = btn.dataset.mtab;
-    app.dataset.mtab = t;
-    document.querySelectorAll('#mobileTabs button').forEach(b => b.classList.toggle('active', b === btn));
-    if (t === 'canvas') drawDoc(playT);
-  };
-});
-
-/* ----- Touch support for canvas drag ----- */
-function canvasPointFromTouch(ev) {
-  const t = ev.touches[0] || ev.changedTouches[0];
-  const rect = stage.getBoundingClientRect();
-  return {
-    x: (t.clientX - rect.left) / rect.width * stage.width,
-    y: (t.clientY - rect.top)  / rect.height * stage.height,
-  };
-}
-stage.addEventListener('touchstart', ev => {
-  if (playing) return;
-  ev.preventDefault();
-  const p = canvasPointFromTouch(ev);
-  const ex = activeExpr();
-  if (!ex) return;
-  for (let i = ex.elements.length - 1; i >= 0; i--) {
-    const el = ex.elements[i];
-    const e = elemAt(el, playT);
-    let hit = false;
-    if (e.kind === 'ellipse') {
-      const dx = (p.x - e.x) / Math.max(1, e.w / 2);
-      const dy = (p.y - e.y) / Math.max(1, e.h / 2);
-      hit = dx*dx + dy*dy <= 1.2;
-    } else if (e.kind === 'rect') {
-      hit = p.x >= e.x - 4 && p.x <= e.x + e.w + 4 && p.y >= e.y - 4 && p.y <= e.y + e.h + 4;
-    } else if (e.kind === 'arc') {
-      const d = Math.hypot(p.x - e.x, p.y - e.y);
-      hit = d <= e.r + 8;
-    }
-    if (hit) {
-      activeElemId = el.id;
-      drag = { dx: p.x - el.x, dy: p.y - el.y };
-      renderAll();
-      return;
-    }
-  }
-}, { passive: false });
-stage.addEventListener('touchmove', ev => {
-  if (drag && activeElem() && !playing) {
-    ev.preventDefault();
-    const p = canvasPointFromTouch(ev);
-    const el = activeElem();
-    el.x = Math.round(p.x - drag.dx);
-    el.y = Math.round(p.y - drag.dy);
-    drawDoc(playT);
-  }
-}, { passive: false });
-stage.addEventListener('touchend', () => { drag = null; renderProps(); }, { passive: true });
-
-/* ----- Boot ----- */
-// Try to auto-load saved doc
+/* ---- boot ---- */
+window.addEventListener('resize', () => { fitStage(); drawDoc(playT); });
 try {
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    const parsed = JSON.parse(raw);
-    if (parsed?.expressions?.length) { doc = parsed; activeExprId = doc.expressions[0].id; }
-  }
+  if (raw) { const p = JSON.parse(raw); if (p?.expressions?.length) { doc = p; activeExprId = doc.expressions[0].id; } }
 } catch {}
 renderAll();
 </script>
