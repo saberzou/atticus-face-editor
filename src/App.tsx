@@ -44,7 +44,7 @@ function NumberField({
           if (e.key === 'Enter') { e.currentTarget.blur() }
           else if (e.key === 'Escape') { setDraft(String(Math.round(value))); setEditing(false) }
         }}
-        className={cn('h-9 w-full rounded-md bg-surface border border-orange px-2 text-right font-mono text-xs text-ink focus:outline-none', className)}
+        className={cn('h-11 md:h-10 w-full rounded-md bg-surface border border-orange px-2 text-right font-mono text-base md:text-xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-orange', className)}
       />
     )
   }
@@ -52,7 +52,7 @@ function NumberField({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className={cn('h-9 w-full rounded-md bg-surface/60 border border-line px-2 text-right font-mono text-xs text-ink-dim hover:border-orange hover:text-ink transition-colors', className)}
+      className={cn('h-11 md:h-9 w-full rounded-md bg-surface/60 border border-line px-2 text-right font-mono text-xs text-ink-dim hover:border-orange hover:text-ink transition-colors duration-150 ease-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange', className)}
       title="Tap to type exact value"
     >
       {Math.round(value)}
@@ -317,9 +317,9 @@ function PartRow({
               value={el.name}
               onChange={(e) => onRename(e.target.value)}
               placeholder="Name"
-              className="h-9 rounded-md bg-surface border border-line px-3 text-sm text-ink focus:border-orange focus:outline-none"
+              className="h-11 md:h-9 rounded-md bg-surface border border-line px-3 text-base md:text-sm text-ink focus:border-orange focus:outline-none"
             />
-            <div className="relative h-9">
+            <div className="relative h-11 md:h-9">
               <input
                 type="color"
                 value={el.color}
@@ -330,7 +330,7 @@ function PartRow({
             </div>
             <button
               onClick={onDelete}
-              className="h-9 rounded-md border border-line text-ink-faint hover:border-bad hover:text-bad transition-colors"
+              className="h-11 md:h-9 rounded-md border border-line text-ink-faint hover:border-bad hover:text-bad transition-colors duration-150 ease-quart"
               aria-label="delete part"
             >
               <Trash2 className="h-4 w-4 mx-auto" />
@@ -437,7 +437,7 @@ function ExpressionMeta({
           type="text"
           value={expr.name}
           onChange={(e) => onMutate('name', e.target.value)}
-          className="h-9 rounded-md bg-surface border border-line px-3 text-sm text-ink focus:border-orange focus:outline-none"
+          className="h-11 md:h-9 rounded-md bg-surface border border-line px-3 text-base md:text-sm text-ink focus:border-orange focus:outline-none"
         />
       </div>
       <div className="grid grid-cols-[3.5rem_1fr] gap-2 items-center">
@@ -446,7 +446,7 @@ function ExpressionMeta({
           type="text"
           value={expr.id}
           onChange={(e) => onMutate('id', e.target.value)}
-          className="h-9 rounded-md bg-surface border border-line px-3 text-sm text-ink font-mono focus:border-orange focus:outline-none"
+          className="h-11 md:h-9 rounded-md bg-surface border border-line px-3 text-base md:text-sm text-ink font-mono focus:border-orange focus:outline-none"
         />
       </div>
       <div className="grid grid-cols-[3.5rem_1fr_4rem] gap-2 items-center">
@@ -489,9 +489,9 @@ function useToasts() {
     setTimeout(() => setList((l) => l.filter((t) => t.id !== id)), 1600)
   }
   const node = (
-    <div className="pointer-events-none fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 space-y-2">
+    <div className="pointer-events-none fixed left-1/2 top-20 z-[100] -translate-x-1/2 space-y-2 md:bottom-6 md:top-auto">
       {list.map((t) => (
-        <div key={t.id} className="rounded-full bg-orange px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[oklch(0.16_0.05_50)] shadow-[0_8px_24px_rgba(0,0,0,0.4)]" style={{ animation: 'toastIn .25s ease-out' }}>
+        <div key={t.id} className="rounded-full bg-orange px-4 py-2 text-xs font-semibold uppercase tracking-wider text-ink-deep shadow-[0_8px_24px_rgba(0,0,0,0.4)]" style={{ animation: 'toastIn .25s ease-out' }}>
           {t.msg}
         </div>
       ))}
@@ -703,7 +703,7 @@ export default function App() {
       {/* Top bar */}
       <header className="flex flex-wrap items-center gap-2 border-b border-line bg-gradient-to-b from-surface to-bg px-3 py-2.5 md:px-5 md:py-3 shrink-0">
         <div className="flex items-baseline gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange to-orange-deep text-[oklch(0.18_0.05_50)] shadow-glow ring-1 ring-white/10">🐻</span>
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange to-orange-deep text-ink-deep shadow-glow ring-1 ring-white/10">🐻</span>
           <h1 className="font-display text-xl md:text-2xl leading-none">atticus <em className="not-italic text-orange italic font-display">face</em></h1>
           <span className="hidden md:inline-block border-l border-line pl-2.5 ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">studio</span>
         </div>
@@ -771,7 +771,7 @@ export default function App() {
           <DialogHeader>
             <DialogTitle>{exportOpen === 'c' ? <>Generated <em className="text-orange italic">C</em></> : <>Face <em className="text-orange italic">JSON</em></>}</DialogTitle>
           </DialogHeader>
-          <textarea readOnly value={exportText} className="h-[60vh] w-full rounded-md bg-bg-deep border border-line p-3 font-mono text-xs leading-relaxed text-ink resize-none focus:border-orange focus:outline-none" />
+          <textarea readOnly value={exportText} className="h-[60vh] w-full rounded-md bg-bg-deep border border-line p-3 font-mono text-base md:text-xs leading-relaxed text-ink resize-none focus:border-orange focus:outline-none" />
           <div className="flex justify-end gap-2">
             <DialogClose asChild><Button variant="default">Close</Button></DialogClose>
             <Button variant="primary" onClick={async () => { await navigator.clipboard.writeText(exportText); toast('copied') }}><Copy className="h-4 w-4" /> Copy</Button>
@@ -783,7 +783,7 @@ export default function App() {
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Import <em className="text-orange italic">JSON</em></DialogTitle></DialogHeader>
-          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste exported face JSON here…" className="h-[50vh] w-full rounded-md bg-bg-deep border border-line p-3 font-mono text-xs leading-relaxed text-ink resize-none focus:border-orange focus:outline-none" />
+          <textarea value={importText} onChange={(e) => setImportText(e.target.value)} placeholder="Paste exported face JSON here…" className="h-[50vh] w-full rounded-md bg-bg-deep border border-line p-3 font-mono text-base md:text-xs leading-relaxed text-ink resize-none focus:border-orange focus:outline-none" />
           <div className="flex justify-end gap-2">
             <DialogClose asChild><Button variant="default">Cancel</Button></DialogClose>
             <Button variant="primary" onClick={handleImport}>Import</Button>

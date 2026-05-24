@@ -9,17 +9,17 @@ export const Button = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'ghost' | 'outline'; size?: 'sm' | 'md' | 'icon' }
 >(({ className, variant = 'default', size = 'md', ...props }, ref) => {
-  const base = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 select-none'
+  const base = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-quart active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange focus-visible:ring-offset-2 focus-visible:ring-offset-bg'
   const variants: Record<string, string> = {
-    default: 'bg-surface-2 text-ink border border-line hover:border-orange',
-    primary: 'bg-gradient-to-b from-orange to-orange-deep text-[oklch(0.16_0.05_50)] border border-orange-deep shadow-glow hover:brightness-110 font-semibold',
+    default: 'bg-surface-2 text-ink-dim border border-line hover:border-orange hover:text-ink',
+    primary: 'bg-gradient-to-b from-orange to-orange-deep text-ink-deep border border-orange-deep shadow-glow hover:brightness-110 font-semibold',
     ghost: 'text-ink-dim hover:text-ink hover:bg-surface',
     outline: 'border border-line text-ink hover:border-orange hover:bg-surface',
   }
   const sizes: Record<string, string> = {
-    sm: 'h-9 px-3 text-xs',
-    md: 'h-10 px-4 text-sm',
-    icon: 'h-10 w-10',
+    sm: 'h-11 md:h-9 px-3 text-xs',
+    md: 'h-11 px-4 text-sm',
+    icon: 'h-11 w-11 md:h-10 md:w-10',
   }
   return <button ref={ref} className={cn(base, variants[variant], sizes[size], className)} {...props} />
 })
@@ -71,9 +71,9 @@ export const Slider = React.forwardRef<
     {...props}
   >
     <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-surface-2 border border-line">
-      <SliderPrimitive.Range className="absolute h-full bg-orange/60" />
+      <SliderPrimitive.Range className="absolute h-full bg-orange" />
     </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-4 w-4 rounded-full bg-ink ring-offset-bg-deep transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange shadow-[0_0_0_3px_oklch(0.16_0.012_55)]" />
+    <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full bg-orange ring-2 ring-ink/90 ring-offset-2 ring-offset-bg-deep transition-transform focus-visible:outline-none focus-visible:ring-orange active:scale-110" />
   </SliderPrimitive.Root>
 ))
 Slider.displayName = 'Slider'
@@ -89,7 +89,7 @@ export const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn('fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0', className)}
+    className={cn('fixed inset-0 z-50 bg-bg-deep/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0', className)}
     {...props}
   />
 ))
