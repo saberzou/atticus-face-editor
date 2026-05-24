@@ -468,8 +468,9 @@
     .main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
     .strip { display: none; }
     .inspector { display: none; }
-    .stage-host { padding: 12px; }
-    .stage-meta { padding: 6px 12px; gap: 14px; font-size: 10px; }
+    .stage-wrap { min-height: 200px; }
+    .stage-host { padding: 10px; min-height: 0; }
+    .stage-meta { padding: 6px 12px; gap: 14px; font-size: 10px; flex-wrap: wrap; }
     .stage-meta .item span { font-size: 8px; }
     .timeline { padding: 8px 12px; gap: 8px; }
     .tbtn { width: 36px; height: 36px; }
@@ -477,20 +478,24 @@
 
     .sheet {
       background: var(--bg-deep); border-top: 1px solid var(--line);
-      max-height: 52vh; display: flex; flex-direction: column; min-height: 0;
+      height: 48vh; max-height: 60vh; min-height: 240px;
+      display: flex; flex-direction: column; min-height: 0;
+      box-shadow: 0 -8px 24px oklch(0 0 0 / 0.4);
     }
     .sheet-tabs {
       display: grid; grid-template-columns: 1fr 1fr 1fr;
-      background: var(--bg); border-bottom: 1px solid var(--line);
+      background: var(--surface); border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; z-index: 5;
     }
     .sheet-tabs button {
-      padding: 12px 8px; color: var(--ink-faint);
-      font: 600 11px/1 var(--body); text-transform: uppercase; letter-spacing: 0.12em;
-      border-bottom: 2px solid transparent; min-height: 44px;
-      transition: all .15s;
+      padding: 14px 8px; color: var(--ink-dim);
+      font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: 0.14em;
+      border-bottom: 2px solid transparent; min-height: 48px;
+      transition: all .15s; position: relative;
     }
+    .sheet-tabs button + button { border-left: 1px solid var(--line-soft); }
     .sheet-tabs button.active {
-      color: var(--ink); border-bottom-color: var(--orange);
+      color: var(--orange); border-bottom-color: var(--orange);
       background: var(--bg-deep);
     }
     .sheet-body { flex: 1; overflow-y: auto; min-height: 0; }
@@ -696,8 +701,8 @@ const stageBox = $('#stageBox');
 
 function fitStage() {
   const rect = stageHost.getBoundingClientRect();
-  const availW = rect.width - 8;
-  const availH = rect.height - 8;
+  const availW = Math.max(40, rect.width - 8);
+  const availH = Math.max(40, rect.height - 8);
   const ar = LCD_W / LCD_H;
   let w = availW, h = w / ar;
   if (h > availH) { h = availH; w = h * ar; }
@@ -706,6 +711,13 @@ function fitStage() {
   stageBox.style.width = w + 'px';
   stageBox.style.height = h + 'px';
 }
+
+// Refit reactively — stage may resize when sheet animates or keyboard appears.
+if (typeof ResizeObserver !== 'undefined') {
+  const ro = new ResizeObserver(() => { fitStage(); drawDoc(playT); });
+  ro.observe(stageHost);
+}
+window.addEventListener('orientationchange', () => setTimeout(() => { fitStage(); drawDoc(playT); }, 200));
 
 function drawDocOn(targetCtx, w, h, expr, t, opts = {}) {
   const sx = w / LCD_W, sy = h / LCD_H;
@@ -1223,6 +1235,10 @@ try {
   if (raw) { const p = JSON.parse(raw); if (p?.expressions?.length) { doc = p; activeExprId = doc.expressions[0].id; } }
 } catch {}
 renderAll();
+// Belt-and-suspenders refit after layout settles (iOS dvh, web font loading).
+requestAnimationFrame(() => { fitStage(); drawDoc(playT); renderStripDesktop(); });
+setTimeout(() => { fitStage(); drawDoc(playT); renderStripDesktop(); }, 250);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { fitStage(); drawDoc(playT); });
 </script>
 </body>
 </html>
