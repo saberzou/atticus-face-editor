@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Atticus Face Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #1a1612;
+    --panel: #221c17;
+    --panel2: #2a221c;
+    --line: #3a2f26;
+    --ink: #f3ead9;
+    --dim: #a39686;
+    --orange: #ff8a2b;
+    --orange-soft: #ff9d4d;
+    --green: #7cd17e;
+    --red: #e7615b;
+    --accent: #ff8a2b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  /* Layout */
+  .app { display: grid; grid-template-columns: 200px 1fr 300px; grid-template-rows: 48px 1fr; height: 100vh; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header .title { font-weight: 600; letter-spacing: .2px; }
+  header .title em { color: var(--orange); font-style: normal; }
+  header .spacer { flex: 1; }
+  header button { padding: 6px 12px; background: var(--panel2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+  header button.primary { background: var(--orange); color: #1a1208; border-color: var(--orange); font-weight: 600; }
+  header button.primary:hover { background: var(--orange-soft); }
+  header button:hover { border-color: var(--orange); }
+  header .badge { padding: 3px 8px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+
+  aside.left { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
+  aside.right { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; }
+  main { display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px; overflow: auto; }
+
+  /* Sidebar groups */
+  .group { padding: 14px 14px 8px; border-bottom: 1px solid var(--line); }
+  .group h3 { margin: 0 0 10px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+
+  /* Expression tabs */
+  .expr-list { display: flex; flex-direction: column; gap: 4px; }
+  .expr-tab { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--panel2); border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+  .expr-tab:hover { border-color: var(--line); }
+  .expr-tab.active { border-color: var(--orange); background: rgba(255, 138, 43, .1); }
+  .expr-tab .name { font-weight: 500; }
+  .expr-tab .anim-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .expr-tab .anim-dot.has { background: var(--green); }
+
+  /* Element list */
+  .elem-list { display: flex; flex-direction: column; gap: 4px; }
+  .elem-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--panel2); border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+  .elem-row:hover { border-color: var(--line); }
+  .elem-row.active { border-color: var(--orange); background: rgba(255, 138, 43, .08); }
+  .elem-row .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; border: 1px solid #0006; }
+  .elem-row .label { flex: 1; font-size: 13px; }
+  .elem-row .anim-mark { color: var(--green); font-size: 10px; }
+  .elem-row button.del { background: transparent; border: 0; color: var(--dim); padding: 2px 6px; border-radius: 4px; }
+  .elem-row button.del:hover { color: var(--red); }
+
+  .add-elem { display: flex; gap: 4px; margin-top: 8px; }
+  .add-elem button { flex: 1; padding: 6px 4px; background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; color: var(--ink); font-size: 12px; }
+  .add-elem button:hover { border-color: var(--orange); }
+
+  /* Canvas area */
+  .canvas-wrap { position: relative; background: #000; border: 2px solid var(--line); border-radius: 8px; box-shadow: 0 8px 32px #0008; }
+  canvas#stage { display: block; image-rendering: pixelated; }
+  .canvas-info { color: var(--dim); font-size: 12px; display: flex; gap: 16px; }
+  .canvas-info span b { color: var(--ink); font-weight: 600; }
+
+  .play-bar { display: flex; align-items: center; gap: 12px; background: var(--panel); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); }
+  .play-bar button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; color: var(--ink); }
+  .play-bar button.play { background: var(--orange); border-color: var(--orange); color: #1a1208; font-weight: 600; }
+  .play-bar .time { color: var(--dim); font-variant-numeric: tabular-nums; min-width: 60px; text-align: right; }
+  .play-bar input[type=range] { flex: 1; min-width: 200px; }
+
+  /* Property panel */
+  .prop-row { display: grid; grid-template-columns: 70px 1fr auto; gap: 8px; align-items: center; margin: 6px 0; }
+  .prop-row label { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .prop-row input[type=number], .prop-row input[type=text], .prop-row select { width: 100%; padding: 5px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; color: var(--ink); }
+  .prop-row input[type=color] { width: 38px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: transparent; cursor: pointer; }
+  .prop-row button.key { background: transparent; border: 1px solid var(--line); color: var(--dim); padding: 3px 7px; border-radius: 4px; font-size: 11px; }
+  .prop-row button.key.has { background: var(--green); border-color: var(--green); color: #0a1f0a; }
+
+  .keyframes { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .kf-row { display: grid; grid-template-columns: 60px 1fr auto; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
+  .kf-row .t { color: var(--orange); font-variant-numeric: tabular-nums; }
+  .kf-row button { background: transparent; border: 0; color: var(--dim); padding: 0 4px; }
+  .kf-row button:hover { color: var(--red); }
+
+  .expr-meta { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .expr-meta .prop-row { grid-template-columns: 80px 1fr; }
+
+  /* Empty state */
+  .empty { padding: 20px; text-align: center; color: var(--dim); font-size: 13px; }
+
+  .hint { padding: 8px 14px; font-size: 11px; color: var(--dim); border-top: 1px solid var(--line); background: var(--panel2); }
+  .hint code { background: var(--bg); padding: 1px 4px; border-radius: 3px; color: var(--orange); }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: #000a; display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; max-width: 720px; width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal h2 { margin: 0 0 12px; }
+  .modal textarea { flex: 1; min-height: 400px; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: 12px/1.5 "SF Mono", Menlo, monospace; resize: vertical; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .modal-actions button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); }
+  .modal-actions button.primary { background: var(--orange); color: #1a1208; border-color: var(--orange); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="title">🐻 atticus <em>face editor</em></div>
+    <span class="badge" id="dimsBadge">320 × 240 · RGB565</span>
+    <div class="spacer"></div>
+    <button id="btnSave" title="Save to browser localStorage">💾 Save</button>
+    <button id="btnLoad" title="Load from browser localStorage">📂 Load</button>
+    <button id="btnImport">Import JSON</button>
+    <button id="btnExportJson">Export JSON</button>
+    <button id="btnExportC">Export C code</button>
+    <button id="btnPush" class="primary" title="Push current expression to Leo (requires bridge /face endpoint — coming soon)">→ Push to Leo</button>
+  </header>
+
+  <aside class="left">
+    <div class="group">
+      <h3>Expressions</h3>
+      <div class="expr-list" id="exprList"></div>
+      <div class="add-elem">
+        <button id="addExpr">+ new expression</button>
+      </div>
+    </div>
+    <div class="expr-meta" id="exprMeta"></div>
+    <div class="group">
+      <h3>Elements</h3>
+      <div class="elem-list" id="elemList"></div>
+      <div class="add-elem">
+        <button data-add="ellipse">+ Ellipse</button>
+        <button data-add="rect">+ Rect</button>
+        <button data-add="arc">+ Arc</button>
+      </div>
+    </div>
+    <div class="hint">
+      Drag on canvas to move selected element.<br>
+      ↑/↓/←/→ nudges by 1px (shift = 10).
+    </div>
+  </aside>
+
+  <main>
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="stage" width="320" height="240" style="width: 640px; height: 480px;"></canvas>
+    </div>
+    <div class="canvas-info">
+      <span>cursor: <b id="curPos">—</b></span>
+      <span>zoom: <b>2×</b></span>
+      <span id="selInfo"></span>
+    </div>
+    <div class="play-bar">
+      <button id="btnPlay" class="play">▶ Play</button>
+      <button id="btnStop">⏹</button>
+      <span class="time" id="playTime">0.00s</span>
+      <input type="range" id="scrub" min="0" max="2000" value="0" />
+    </div>
+  </main>
+
+  <aside class="right" id="propsPane">
+    <div class="empty">Select an element to edit its properties.</div>
+  </aside>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+ * Atticus Face Editor — vector face spec + keyframe animation
+ * ============================================================
+ *
+ * Data model (a face document is a JSON object):
+ *
+ *   {
+ *     version: 1,
+ *     width: 320, height: 240,
+ *     background: "#000000",
+ *     expressions: [
+ *       {
+ *         id: "neutral",
+ *         name: "Neutral",
+ *         duration: 0,             // 0 = static (no loop). >0 = animated, loops every duration ms.
+ *         elements: [
+ *           {
+ *             id: "uuid",
+ *             kind: "ellipse" | "rect" | "arc",
+ *             // base props (used when no keyframe at t=0)
+ *             x: 100, y: 100,
+ *             // ellipse/rect:
+ *             w: 56, h: 72,         // (ellipse: full width/height; rect: w/h)
+ *             // arc:
+ *             r: 24, thick: 5, start: 0, end: 180,  // start/end in degrees, 0=right, 90=down (canvas-y-down)
+ *             color: "#f3ead9",
+ *             keyframes: {
+ *               // per-property animation tracks: prop -> [{ t: ms, v: value, easing: "linear"|"easeInOut" }]
+ *               x: [{ t: 0, v: 100 }, { t: 500, v: 110 }, { t: 1000, v: 100 }],
+ *               ...
+ *             }
+ *           }
+ *         ]
+ *       }
+ *     ]
+ *   }
+ */
+
+// ----- Default colors used in firmware (kept in sync with face_anim.c) -----
+const DEFAULT = {
+  BEAR:   "#ff8a2b",
+  EYE:    "#f3ead9",
+  MOUTH:  "#f3ead9",
+  BG:     "#000000",
+};
+
+// ----- Seed: port of current Atticus face (face_anim.c) -----
+function seedDoc() {
+  const LCD_W = 320, LCD_H = 240;
+  const eye_y  = LCD_H / 2 - 20;
+  const eye_lx = LCD_W / 2 - 60;
+  const eye_rx = LCD_W / 2 + 60;
+  const eye_rad = 28, eye_ry = 36;
+  const mouth_cx = LCD_W / 2;
+  const mouth_cy = LCD_H / 2 + 50;
+
+  const earEl = () => ({ id: uid(), kind: "ellipse", x: 20, y: 20, w: 24, h: 24, color: DEFAULT.BEAR, keyframes: {} });
+  const mouth = (r = 24) => ({ id: uid(), kind: "arc", x: mouth_cx, y: mouth_cy, r: r, thick: 5, start: 0, end: 180, color: DEFAULT.MOUTH, keyframes: {} });
+  const eye = (cx, cy, w, h) => ({ id: uid(), kind: "ellipse", x: cx, y: cy, w: w*2, h: h*2, color: DEFAULT.EYE, keyframes: {} });
+  const closedEye = (cx, cy, w) => ({ id: uid(), kind: "rect", x: cx - w, y: cy - 3, w: w*2, h: 6, color: DEFAULT.EYE, keyframes: {} });
+
+  return {
+    version: 1,
+    width: LCD_W, height: LCD_H,
+    background: DEFAULT.BG,
+    expressions: [
+      { id: "neutral", name: "Neutral", duration: 0, elements: [
+        earEl(),
+        eye(eye_lx, eye_y, eye_rad, eye_ry),
+        eye(eye_rx, eye_y, eye_rad, eye_ry),
+        mouth(24),
+      ]},
+      { id: "happy", name: "Happy", duration: 0, elements: [
+        earEl(),
+        eye(eye_lx, eye_y + 6, eye_rad, eye_ry / 2),
+        eye(eye_rx, eye_y + 6, eye_rad, eye_ry / 2),
+        mouth(36),
+      ]},
+      { id: "curious", name: "Curious", duration: 0, elements: [
+        earEl(),
+        eye(eye_lx, eye_y, eye_rad, eye_ry),
+        eye(eye_rx, eye_y, eye_rad + 4, eye_ry + 6),
+        mouth(24),
+      ]},
+      { id: "thinking", name: "Thinking", duration: 0, elements: [
+        earEl(),
+        eye(eye_lx + 6, eye_y - 4, eye_rad, eye_ry),
+        eye(eye_rx + 6, eye_y - 4, eye_rad, eye_ry),
+        mouth(24),
+      ]},
+      { id: "listening", name: "Listening", duration: 0, elements: [
+        earEl(),
+        eye(eye_lx, eye_y + 2, eye_rad, eye_ry),
+        eye(eye_rx, eye_y + 2, eye_rad, eye_ry),
+        mouth(24),
+      ]},
+      { id: "sleeping", name: "Sleeping", duration: 0, elements: [
+        earEl(),
+        closedEye(eye_lx, eye_y, eye_rad),
+        closedEye(eye_rx, eye_y, eye_rad),
+      ]},
+      // Bonus: a pre-animated "blink" expression to show keyframes in action.
+      (() => {
+        const d = 4000;
+        const blinkKf = (openH) => [
+          { t: 0,    v: openH },
+          { t: 1800, v: openH },
+          { t: 1900, v: 6 },     // closed
+          { t: 2000, v: openH }, // open again
+          { t: d,    v: openH },
+        ];
+        return { id: "blinking", name: "Blinking (anim)", duration: d, elements: [
+          earEl(),
+          { id: uid(), kind: "ellipse", x: eye_lx, y: eye_y, w: eye_rad*2, h: eye_ry*2, color: DEFAULT.EYE, keyframes: { h: blinkKf(eye_ry*2) } },
+          { id: uid(), kind: "ellipse", x: eye_rx, y: eye_y, w: eye_rad*2, h: eye_ry*2, color: DEFAULT.EYE, keyframes: { h: blinkKf(eye_ry*2) } },
+          mouth(24),
+        ]};
+      })(),
+    ],
+  };
+}
+
+let doc = seedDoc();
+let activeExprId = doc.expressions[0].id;
+let activeElemId = null;
+let playing = false;
+let playStart = 0;
+let playT = 0;
+let drag = null;     // { dx, dy }
+
+/* ----- helpers ----- */
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
+function activeExpr() { return doc.expressions.find(e => e.id === activeExprId); }
+function activeElem() { return activeExpr()?.elements.find(e => e.id === activeElemId); }
+
+/* ----- Animation interpolation ----- */
+function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+function easings(name) { return name === "easeInOut" ? easeInOut : (t) => t; }
+
+function sampleProp(elem, prop, t) {
+  const track = elem.keyframes && elem.keyframes[prop];
+  if (!track || track.length === 0) return elem[prop];
+  if (track.length === 1) return track[0].v;
+  // Find segment
+  let i = 0;
+  while (i < track.length - 1 && track[i + 1].t <= t) i++;
+  if (i >= track.length - 1) return track[track.length - 1].v;
+  const a = track[i], b = track[i + 1];
+  if (b.t === a.t) return b.v;
+  const u = (t - a.t) / (b.t - a.t);
+  const eased = easings(a.easing)(u);
+  if (typeof a.v === "string") return u < 0.5 ? a.v : b.v;
+  return a.v + (b.v - a.v) * eased;
+}
+
+function elemAt(elem, t) {
+  // Return a flat object with current sampled values.
+  const out = { ...elem };
+  for (const prop of Object.keys(elem.keyframes || {})) {
+    out[prop] = sampleProp(elem, prop, t);
+  }
+  return out;
+}
+
+/* ----- Rendering (mirrors firmware face_anim.c primitives) ----- */
+const stage = document.getElementById('stage');
+const ctx = stage.getContext('2d');
+
+function drawDoc(t = 0) {
+  const expr = activeExpr();
+  ctx.fillStyle = doc.background;
+  ctx.fillRect(0, 0, stage.width, stage.height);
+  if (!expr) return;
+  for (const el of expr.elements) {
+    const e = elemAt(el, t);
+    ctx.fillStyle = e.color;
+    if (e.kind === "ellipse") {
+      ctx.beginPath();
+      ctx.ellipse(e.x, e.y, Math.max(1, e.w / 2), Math.max(1, e.h / 2), 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (e.kind === "rect") {
+      ctx.fillRect(e.x, e.y, e.w, e.h);
+    } else if (e.kind === "arc") {
+      const r = Math.max(1, e.r);
+      const thick = Math.max(1, Math.min(e.thick, r));
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r, e.start * Math.PI / 180, e.end * Math.PI / 180);
+      ctx.arc(e.x, e.y, r - thick, e.end * Math.PI / 180, e.start * Math.PI / 180, true);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  // Selection outline
+  if (!playing && activeElemId) {
+    const el = activeElem();
+    if (el) {
+      const e = elemAt(el, t);
+      ctx.strokeStyle = "#ff8a2b";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 2]);
+      if (e.kind === "ellipse") {
+        ctx.beginPath();
+        ctx.ellipse(e.x, e.y, e.w / 2 + 2, e.h / 2 + 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (e.kind === "rect") {
+        ctx.strokeRect(e.x - 1, e.y - 1, e.w + 2, e.h + 2);
+      } else if (e.kind === "arc") {
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r + 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+  }
+}
+
+/* ----- UI rendering ----- */
+function renderExprList() {
+  const list = $('#exprList');
+  list.innerHTML = '';
+  for (const ex of doc.expressions) {
+    const div = document.createElement('div');
+    div.className = 'expr-tab' + (ex.id === activeExprId ? ' active' : '');
+    const hasAnim = ex.duration > 0 || ex.elements.some(el => Object.keys(el.keyframes || {}).length);
+    div.innerHTML = `<span class="name">${escapeHtml(ex.name)}</span><span class="anim-dot ${hasAnim ? 'has' : ''}" title="${hasAnim ? 'has animation' : 'static'}"></span>`;
+    div.onclick = () => { activeExprId = ex.id; activeElemId = null; renderAll(); };
+    list.appendChild(div);
+  }
+}
+
+function renderExprMeta() {
+  const ex = activeExpr();
+  const pane = $('#exprMeta');
+  if (!ex) { pane.innerHTML = ''; return; }
+  pane.innerHTML = `
+    <h3 style="margin: 0 0 10px; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--dim);">Expression</h3>
+    <div class="prop-row"><label>ID</label><input type="text" value="${escapeAttr(ex.id)}" data-meta="id" /></div>
+    <div class="prop-row"><label>Name</label><input type="text" value="${escapeAttr(ex.name)}" data-meta="name" /></div>
+    <div class="prop-row"><label>Loop ms</label><input type="number" min="0" step="100" value="${ex.duration}" data-meta="duration" title="0 = static, >0 = animation loop length" /></div>
+    <div class="prop-row" style="margin-top: 8px;"><label></label><button id="dupExpr" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);font-size:12px;">duplicate</button><button id="delExpr" style="padding:4px 8px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--red);font-size:12px;">delete</button></div>
+  `;
+  pane.querySelectorAll('[data-meta]').forEach(inp => {
+    inp.oninput = () => {
+      const k = inp.dataset.meta;
+      if (k === 'duration') ex.duration = Math.max(0, parseInt(inp.value, 10) || 0);
+      else ex[k] = inp.value;
+      updateScrub();
+      renderExprList();
+    };
+  });
+  $('#dupExpr').onclick = () => {
+    const copy = JSON.parse(JSON.stringify(ex));
+    copy.id = ex.id + '-copy';
+    copy.name = ex.name + ' copy';
+    copy.elements.forEach(el => el.id = uid());
+    doc.expressions.push(copy);
+    activeExprId = copy.id;
+    renderAll();
+  };
+  $('#delExpr').onclick = () => {
+    if (doc.expressions.length === 1) { alert('Need at least one expression.'); return; }
+    if (!confirm(`Delete expression "${ex.name}"?`)) return;
+    doc.expressions = doc.expressions.filter(e => e.id !== activeExprId);
+    activeExprId = doc.expressions[0].id;
+    activeElemId = null;
+    renderAll();
+  };
+}
+
+function renderElemList() {
+  const ex = activeExpr();
+  const list = $('#elemList');
+  list.innerHTML = '';
+  if (!ex) return;
+  ex.elements.forEach((el, i) => {
+    const div = document.createElement('div');
+    div.className = 'elem-row' + (el.id === activeElemId ? ' active' : '');
+    const hasKf = Object.keys(el.keyframes || {}).length > 0;
+    div.innerHTML = `
+      <span class="swatch" style="background:${el.color};"></span>
+      <span class="label">${el.kind} ${i + 1}</span>
+      ${hasKf ? '<span class="anim-mark" title="animated">◆</span>' : ''}
+      <button class="del" title="delete">×</button>
+    `;
+    div.onclick = (e) => {
+      if (e.target.classList.contains('del')) {
+        ex.elements = ex.elements.filter(x => x.id !== el.id);
+        if (activeElemId === el.id) activeElemId = null;
+        renderAll();
+        return;
+      }
+      activeElemId = el.id;
+      renderAll();
+    };
+    list.appendChild(div);
+  });
+  if (ex.elements.length === 0) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = 'No elements yet. Add one below.';
+    list.appendChild(e);
+  }
+}
+
+function renderProps() {
+  const pane = $('#propsPane');
+  const el = activeElem();
+  if (!el) { pane.innerHTML = '<div class="empty">Select an element to edit its properties.</div>'; return; }
+
+  const propsByKind = {
+    ellipse: ['x', 'y', 'w', 'h', 'color'],
+    rect:    ['x', 'y', 'w', 'h', 'color'],
+    arc:     ['x', 'y', 'r', 'thick', 'start', 'end', 'color'],
+  };
+  const props = propsByKind[el.kind];
+
+  let html = `<div class="group"><h3>${el.kind} properties</h3>`;
+  for (const p of props) {
+    const isColor = p === 'color';
+    const hasKf = el.keyframes && el.keyframes[p] && el.keyframes[p].length > 0;
+    const val = el[p] ?? (isColor ? '#ffffff' : 0);
+    html += `<div class="prop-row">
+      <label>${p}</label>
+      ${isColor
+        ? `<input type="color" value="${val}" data-prop="${p}" />`
+        : `<input type="number" step="1" value="${val}" data-prop="${p}" />`}
+      <button class="key ${hasKf ? 'has' : ''}" data-kf="${p}" title="${hasKf ? 'has keyframes' : 'add keyframe at current time'}">${hasKf ? '◆' : '◇'}</button>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Keyframe editor for current property tracks
+  const tracks = Object.keys(el.keyframes || {}).filter(k => el.keyframes[k].length > 0);
+  if (tracks.length) {
+    html += `<div class="group"><h3>keyframes</h3>`;
+    for (const k of tracks) {
+      html += `<div style="margin-bottom:10px;">
+        <div style="font-size:12px; color: var(--orange); margin-bottom:4px; display:flex; justify-content:space-between;">
+          <span>${k}</span>
+          <button data-clearkf="${k}" style="background:transparent;border:0;color:var(--dim);font-size:11px;cursor:pointer;">clear</button>
+        </div>`;
+      for (let i = 0; i < el.keyframes[k].length; i++) {
+        const kf = el.keyframes[k][i];
+        html += `<div class="kf-row">
+          <span class="t">${(kf.t/1000).toFixed(2)}s</span>
+          <input type="${typeof kf.v === 'string' ? 'color' : 'number'}" value="${kf.v}" data-kfedit-prop="${k}" data-kfedit-idx="${i}" />
+          <button data-kfdel-prop="${k}" data-kfdel-idx="${i}">×</button>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  pane.innerHTML = html;
+
+  // Bind value inputs
+  pane.querySelectorAll('[data-prop]').forEach(inp => {
+    inp.oninput = () => {
+      const p = inp.dataset.prop;
+      el[p] = inp.type === 'color' ? inp.value : parseFloat(inp.value);
+      renderElemList();
+      drawDoc(playT);
+    };
+  });
+  // Bind keyframe buttons (add keyframe at current time)
+  pane.querySelectorAll('[data-kf]').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.kf;
+      el.keyframes = el.keyframes || {};
+      el.keyframes[p] = el.keyframes[p] || [];
+      const t = playT;
+      // Replace existing keyframe at this time, otherwise insert
+      const existing = el.keyframes[p].findIndex(k => k.t === t);
+      const v = el[p];
+      if (existing >= 0) el.keyframes[p][existing].v = v;
+      else el.keyframes[p].push({ t, v });
+      el.keyframes[p].sort((a, b) => a.t - b.t);
+      if (!activeExpr().duration) activeExpr().duration = 2000;
+      renderAll();
+    };
+  });
+  pane.querySelectorAll('[data-kfedit-prop]').forEach(inp => {
+    inp.oninput = () => {
+      const p = inp.dataset.kfeditProp;
+      const i = parseInt(inp.dataset.kfeditIdx, 10);
+      el.keyframes[p][i].v = inp.type === 'color' ? inp.value : parseFloat(inp.value);
+      drawDoc(playT);
+      renderElemList();
+    };
+  });
+  pane.querySelectorAll('[data-kfdel-prop]').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.kfdelProp;
+      const i = parseInt(btn.dataset.kfdelIdx, 10);
+      el.keyframes[p].splice(i, 1);
+      if (el.keyframes[p].length === 0) delete el.keyframes[p];
+      renderAll();
+    };
+  });
+  pane.querySelectorAll('[data-clearkf]').forEach(btn => {
+    btn.onclick = () => {
+      const p = btn.dataset.clearkf;
+      delete el.keyframes[p];
+      renderAll();
+    };
+  });
+}
+
+function updateScrub() {
+  const ex = activeExpr();
+  const d = ex?.duration || 0;
+  const scrub = $('#scrub');
+  scrub.max = Math.max(d, 100);
+  scrub.disabled = d === 0;
+  $('#playTime').textContent = (playT / 1000).toFixed(2) + 's';
+  scrub.value = playT;
+}
+
+function renderAll() {
+  renderExprList();
+  renderExprMeta();
+  renderElemList();
+  renderProps();
+  updateScrub();
+  drawDoc(playT);
+}
+
+/* ----- Canvas interaction ----- */
+function canvasPoint(ev) {
+  const rect = stage.getBoundingClientRect();
+  return {
+    x: (ev.clientX - rect.left) / rect.width * stage.width,
+    y: (ev.clientY - rect.top)  / rect.height * stage.height,
+  };
+}
+stage.addEventListener('mousemove', ev => {
+  const p = canvasPoint(ev);
+  $('#curPos').textContent = `${Math.round(p.x)}, ${Math.round(p.y)}`;
+  if (drag && activeElem() && !playing) {
+    const el = activeElem();
+    el.x = Math.round(p.x - drag.dx);
+    el.y = Math.round(p.y - drag.dy);
+    drawDoc(playT);
+    renderProps();
+  }
+});
+stage.addEventListener('mousedown', ev => {
+  if (playing) return;
+  const p = canvasPoint(ev);
+  // Pick topmost element under cursor
+  const ex = activeExpr();
+  if (!ex) return;
+  for (let i = ex.elements.length - 1; i >= 0; i--) {
+    const el = ex.elements[i];
+    const e = elemAt(el, playT);
+    let hit = false;
+    if (e.kind === 'ellipse') {
+      const dx = (p.x - e.x) / Math.max(1, e.w / 2);
+      const dy = (p.y - e.y) / Math.max(1, e.h / 2);
+      hit = dx*dx + dy*dy <= 1;
+    } else if (e.kind === 'rect') {
+      hit = p.x >= e.x && p.x <= e.x + e.w && p.y >= e.y && p.y <= e.y + e.h;
+    } else if (e.kind === 'arc') {
+      const d = Math.hypot(p.x - e.x, p.y - e.y);
+      hit = d <= e.r + 4;
+    }
+    if (hit) {
+      activeElemId = el.id;
+      drag = { dx: p.x - el.x, dy: p.y - el.y };
+      renderAll();
+      return;
+    }
+  }
+});
+window.addEventListener('mouseup', () => { drag = null; });
+window.addEventListener('keydown', ev => {
+  if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+  const el = activeElem();
+  if (!el) return;
+  const step = ev.shiftKey ? 10 : 1;
+  if (ev.key === 'ArrowLeft')  { el.x -= step; ev.preventDefault(); }
+  else if (ev.key === 'ArrowRight') { el.x += step; ev.preventDefault(); }
+  else if (ev.key === 'ArrowUp')    { el.y -= step; ev.preventDefault(); }
+  else if (ev.key === 'ArrowDown')  { el.y += step; ev.preventDefault(); }
+  else if (ev.key === 'Delete' || ev.key === 'Backspace') {
+    activeExpr().elements = activeExpr().elements.filter(e => e.id !== el.id);
+    activeElemId = null;
+    ev.preventDefault();
+  } else return;
+  renderAll();
+});
+
+/* ----- Play / scrub ----- */
+function tick(now) {
+  if (!playing) return;
+  const ex = activeExpr();
+  const d = ex?.duration || 0;
+  if (d > 0) {
+    playT = (now - playStart) % d;
+  }
+  drawDoc(playT);
+  $('#playTime').textContent = (playT / 1000).toFixed(2) + 's';
+  $('#scrub').value = playT;
+  requestAnimationFrame(tick);
+}
+
+$('#btnPlay').onclick = () => {
+  playing = !playing;
+  $('#btnPlay').textContent = playing ? '⏸ Pause' : '▶ Play';
+  if (playing) { playStart = performance.now() - playT; requestAnimationFrame(tick); }
+};
+$('#btnStop').onclick = () => { playing = false; playT = 0; $('#btnPlay').textContent = '▶ Play'; renderAll(); };
+$('#scrub').oninput = () => { playT = parseFloat($('#scrub').value); $('#playTime').textContent = (playT / 1000).toFixed(2) + 's'; drawDoc(playT); };
+
+/* ----- Add elements ----- */
+$$('.add-elem [data-add]').forEach(btn => {
+  btn.onclick = () => {
+    const kind = btn.dataset.add;
+    const ex = activeExpr();
+    if (!ex) return;
+    const base = { id: uid(), kind, color: DEFAULT.EYE, keyframes: {} };
+    if (kind === 'ellipse') Object.assign(base, { x: 160, y: 120, w: 40, h: 40 });
+    else if (kind === 'rect') Object.assign(base, { x: 140, y: 110, w: 40, h: 20 });
+    else if (kind === 'arc') Object.assign(base, { x: 160, y: 170, r: 30, thick: 5, start: 0, end: 180 });
+    ex.elements.push(base);
+    activeElemId = base.id;
+    renderAll();
+  };
+});
+
+$('#addExpr').onclick = () => {
+  const id = prompt('expression id (lowercase, no spaces):', 'new_expr');
+  if (!id) return;
+  if (doc.expressions.find(e => e.id === id)) { alert('id exists'); return; }
+  doc.expressions.push({ id, name: id, duration: 0, elements: [] });
+  activeExprId = id;
+  activeElemId = null;
+  renderAll();
+};
+
+/* ----- Save / Load / Import / Export ----- */
+const STORAGE_KEY = 'atticus-face-doc-v1';
+$('#btnSave').onclick = () => { localStorage.setItem(STORAGE_KEY, JSON.stringify(doc)); flash('saved'); };
+$('#btnLoad').onclick = () => {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return alert('Nothing saved.');
+  try { doc = JSON.parse(raw); activeExprId = doc.expressions[0].id; activeElemId = null; renderAll(); flash('loaded'); }
+  catch (e) { alert('Bad saved data: ' + e); }
+};
+
+$('#btnImport').onclick = () => openModal('Import JSON', '', (text) => {
+  try {
+    const parsed = JSON.parse(text);
+    if (!parsed.expressions) throw new Error('Missing expressions');
+    doc = parsed;
+    activeExprId = doc.expressions[0].id;
+    activeElemId = null;
+    renderAll();
+    flash('imported');
+    return true;
+  } catch (e) { alert('Import failed: ' + e); return false; }
+});
+
+$('#btnExportJson').onclick = () => openModal('Face JSON (read-only)', JSON.stringify(doc, null, 2), null, true);
+$('#btnExportC').onclick = () => openModal('C code for face_anim.c', generateC(doc), null, true);
+
+$('#btnPush').onclick = async () => {
+  const url = prompt('Bridge URL (no trailing slash)', 'http://localhost:8770');
+  if (!url) return;
+  const token = prompt('Bearer token (paste once; not stored)');
+  if (!token) return;
+  try {
+    const res = await fetch(url + '/face', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expression: activeExprId, doc }),
+    });
+    if (res.ok) flash('pushed ✓');
+    else flash('push failed: ' + res.status);
+  } catch (e) { flash('push error: ' + e.message); }
+};
+
+function flash(msg) {
+  const b = document.createElement('div');
+  b.textContent = msg;
+  b.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--orange);color:#1a1208;padding:8px 16px;border-radius:6px;font-weight:600;z-index:1000;box-shadow:0 4px 12px #0008;';
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 1500);
+}
+
+/* ----- C code generator ----- */
+function generateC(doc) {
+  let s = '/* Auto-generated by atticus-face-editor. Drop into face_anim.c. */\n\n';
+  s += 'typedef enum {\n';
+  doc.expressions.forEach((ex, i) => { s += `    FACE_${ex.id.toUpperCase().replace(/[^A-Z0-9]/g, '_')} = ${i},\n`; });
+  s += '} face_expression_t;\n\n';
+  s += 'static void face_render_expression(face_expression_t expr, uint32_t t_ms) {\n';
+  s += '    memset(s_fb, 0, FB_BYTES);\n';
+  s += '    switch (expr) {\n';
+  for (const ex of doc.expressions) {
+    s += `    case FACE_${ex.id.toUpperCase().replace(/[^A-Z0-9]/g, '_')}: {\n`;
+    if (ex.duration > 0) {
+      s += `        uint32_t t = t_ms % ${ex.duration}u;\n`;
+    } else {
+      s += `        (void)t_ms;\n`;
+    }
+    for (const el of ex.elements) {
+      const ec = el.color.replace('#', '');
+      const r = parseInt(ec.slice(0, 2), 16), g = parseInt(ec.slice(2, 4), 16), b = parseInt(ec.slice(4, 6), 16);
+      const rgb565 = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+      const hex565 = '0x' + rgb565.toString(16).padStart(4, '0').toUpperCase();
+      const sample = (p) => {
+        if (el.keyframes && el.keyframes[p] && el.keyframes[p].length) {
+          // Inline a small interpolator. Better: emit a helper. For brevity, hardcode lerp between 2 nearest.
+          const track = el.keyframes[p];
+          let lines = `        int ${p}_val;\n`;
+          lines += `        {\n`;
+          lines += `            uint32_t kt[] = {${track.map(k => k.t).join(', ')}};\n`;
+          lines += `            int kv[] = {${track.map(k => Math.round(k.v)).join(', ')}};\n`;
+          lines += `            int n = ${track.length}; int i = 0;\n`;
+          lines += `            while (i < n - 1 && kt[i + 1] <= t) i++;\n`;
+          lines += `            if (i >= n - 1) ${p}_val = kv[n - 1];\n`;
+          lines += `            else { uint32_t a = kt[i], b = kt[i + 1]; int u = (int)((t - a) * 1000 / (b - a)); ${p}_val = kv[i] + (kv[i + 1] - kv[i]) * u / 1000; }\n`;
+          lines += `        }\n`;
+          return { decl: lines, ref: `${p}_val` };
+        }
+        return { decl: '', ref: String(Math.round(el[p])) };
+      };
+      if (el.kind === 'ellipse') {
+        const X = sample('x'), Y = sample('y'), W = sample('w'), H = sample('h');
+        s += `        {\n${X.decl}${Y.decl}${W.decl}${H.decl}            fill_ellipse(${X.ref}, ${Y.ref}, ${W.ref}/2, ${H.ref}/2, ${hex565});\n        }\n`;
+      } else if (el.kind === 'rect') {
+        const X = sample('x'), Y = sample('y'), W = sample('w'), H = sample('h');
+        s += `        {\n${X.decl}${Y.decl}${W.decl}${H.decl}            fill_rect(${X.ref}, ${Y.ref}, ${W.ref}, ${H.ref}, ${hex565});\n        }\n`;
+      } else if (el.kind === 'arc') {
+        const X = sample('x'), Y = sample('y'), R = sample('r'), T = sample('thick');
+        s += `        {\n${X.decl}${Y.decl}${R.decl}${T.decl}            draw_mouth_arc(${X.ref}, ${Y.ref}, ${R.ref}, ${T.ref}, ${hex565});\n        }\n`;
+      }
+    }
+    s += '        break;\n    }\n';
+  }
+  s += '    default: break;\n    }\n}\n';
+  return s;
+}
+
+/* ----- Modal ----- */
+function openModal(title, body, onApply, readOnly = false) {
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <h2>${escapeHtml(title)}</h2>
+      <textarea ${readOnly ? 'readonly' : ''}>${escapeHtml(body)}</textarea>
+      <div class="modal-actions">
+        <button data-act="close">Close</button>
+        ${readOnly ? '<button data-act="copy" class="primary">Copy</button>' : '<button data-act="apply" class="primary">Apply</button>'}
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+  bg.querySelector('[data-act="close"]').onclick = () => bg.remove();
+  if (readOnly) {
+    bg.querySelector('[data-act="copy"]').onclick = async () => {
+      await navigator.clipboard.writeText(bg.querySelector('textarea').value);
+      flash('copied');
+    };
+  } else {
+    bg.querySelector('[data-act="apply"]').onclick = () => {
+      if (onApply(bg.querySelector('textarea').value)) bg.remove();
+    };
+  }
+}
+
+/* ----- Utils ----- */
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+function escapeAttr(s) { return escapeHtml(s); }
+
+/* ----- Boot ----- */
+// Try to auto-load saved doc
+try {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    if (parsed?.expressions?.length) { doc = parsed; activeExprId = doc.expressions[0].id; }
+  }
+} catch {}
+renderAll();
+</script>
+</body>
+</html>
