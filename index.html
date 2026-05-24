@@ -39,6 +39,7 @@
     overflow: hidden; overscroll-behavior: none;
     -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
   }
+  .app, .main, .sheet, .sheet-body, .stage-wrap, .stage-host { max-width: 100vw; overflow-x: hidden; }
   body::before {
     content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999;
     background:
@@ -508,8 +509,10 @@
 
     .expr-strip-mobile {
       display: flex; gap: 10px; padding: 14px 16px;
-      overflow-x: auto; scroll-snap-type: x mandatory;
+      overflow-x: auto; overflow-y: hidden;
+      scroll-snap-type: x mandatory;
       -webkit-overflow-scrolling: touch;
+      max-width: 100%;
     }
     .expr-strip-mobile .expr {
       flex-direction: column; width: 96px; flex-shrink: 0;
