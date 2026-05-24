@@ -697,7 +697,7 @@ export default function App() {
   )
 
   return (
-    <div className="flex min-h-[100dvh] w-full max-w-[100vw] flex-col bg-bg">
+    <div className="w-full max-w-[100vw] bg-bg md:flex md:h-[100dvh] md:flex-col md:overflow-hidden">
       {/* atmosphere */}
       <div className="pointer-events-none fixed inset-0 z-[999]" style={{ backgroundImage: 'radial-gradient(ellipse at 75% -10%, oklch(0.78 0.18 55 / 0.10), transparent 50%), radial-gradient(ellipse at -10% 90%, oklch(0.50 0.10 30 / 0.06), transparent 55%)' }} />
 
@@ -731,9 +731,9 @@ export default function App() {
         onAdd={addExpression}
       />
 
-      {/* Body: mobile = page scrolls naturally | desktop = stage + sidebar */}
-      <div className="flex-1 min-h-0 md:grid md:grid-cols-[1fr_22rem] max-w-full md:overflow-hidden">
-        <main className="flex min-h-0 flex-col bg-gradient-to-b from-bg via-bg to-bg-deep md:overflow-hidden">
+      {/* Body: mobile = block flow (scrolls naturally) | desktop = stage + sidebar grid */}
+      <div className="max-w-full md:flex-1 md:min-h-0 md:grid md:grid-cols-[1fr_22rem] md:overflow-hidden">
+        <main className="flex flex-col bg-gradient-to-b from-bg via-bg to-bg-deep md:min-h-0 md:overflow-hidden">
           <Stage
             doc={doc} expr={activeExpr} t={playT} selectionId={activeElemId}
             onSelect={setActiveElemId}
@@ -754,7 +754,7 @@ export default function App() {
         </main>
 
         {/* Inspector — desktop sidebar (scrolls), mobile inline (no fixed sheet) */}
-        <aside className="bg-bg-deep md:border-l md:border-line md:overflow-y-auto">
+        <aside className="bg-bg-deep md:border-l md:border-line md:min-h-0 md:overflow-y-auto">
           {inspector}
         </aside>
       </div>
