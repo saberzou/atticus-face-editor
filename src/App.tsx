@@ -78,16 +78,14 @@ function Stage({
   const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const [size, setSize] = useState({ w: 320, h: 240 })
 
+  // Measure the actual rendered (aspect-locked) box and sync canvas backing.
   useEffect(() => {
     if (!wrapRef.current) return
     const ro = new ResizeObserver(() => {
       if (!wrapRef.current) return
       const r = wrapRef.current.getBoundingClientRect()
-      const ar = LCD_W / LCD_H
-      let w = r.width, h = w / ar
-      if (h > r.height) { h = r.height; w = h * ar }
-      w = Math.max(80, Math.floor(w))
-      h = Math.max(60, Math.floor(h))
+      const w = Math.max(80, Math.round(r.width))
+      const h = Math.max(60, Math.round(r.height))
       setSize({ w, h })
     })
     ro.observe(wrapRef.current)
@@ -110,11 +108,14 @@ function Stage({
   }, [])
 
   return (
-    <div ref={wrapRef} className="flex-1 min-h-0 flex items-center justify-center p-3 md:p-5 max-w-full overflow-hidden">
-      <div className="relative bg-black rounded-2xl shadow-stage max-w-full max-h-full" style={{ width: size.w, height: size.h }}>
+    <div className="shrink-0 p-3 md:p-5 max-w-full overflow-hidden">
+      <div
+        ref={wrapRef}
+        className="relative mx-auto bg-black rounded-2xl shadow-stage w-full max-w-[640px] aspect-[4/3]"
+      >
         <canvas
           ref={canvasRef}
-          className="block w-full h-full rounded-2xl"
+          className="absolute inset-0 w-full h-full rounded-2xl block"
           style={{ imageRendering: 'pixelated', touchAction: 'none' }}
           onPointerDown={(ev) => {
             (ev.target as Element).setPointerCapture(ev.pointerId)
@@ -161,7 +162,7 @@ function ExpressionSwitcher({
   doc, activeId, onSelect, onAdd,
 }: { doc: FaceDoc; activeId: string; onSelect: (id: string) => void; onAdd: () => void }) {
   return (
-    <div className="shrink-0 border-b border-line bg-bg-deep/60">
+    <div className="shrink-0">
       <div className="flex gap-2 overflow-x-auto px-3 py-2.5 md:px-5 snap-x snap-mandatory">
         {doc.expressions.map((ex) => {
           const isActive = ex.id === activeId
@@ -171,8 +172,8 @@ function ExpressionSwitcher({
               key={ex.id}
               onClick={() => onSelect(ex.id)}
               className={cn(
-                'group relative shrink-0 snap-start rounded-lg border p-1.5 transition-all',
-                isActive ? 'border-orange bg-gradient-to-br from-[oklch(0.22_0.05_55)] to-surface shadow-glow' : 'border-line bg-surface hover:border-ink-faint hover:bg-surface-2',
+                'group relative shrink-0 snap-start rounded-lg p-1.5 transition-all min-h-11',
+                isActive ? 'bg-gradient-to-br from-[oklch(0.22_0.05_55)] to-surface shadow-glow ring-1 ring-orange' : 'bg-surface hover:bg-surface-2',
               )}
             >
               <div className="flex items-center gap-2">
@@ -294,11 +295,11 @@ function PartRow({
   const tracks = Object.keys(el.keyframes || {}).filter((k) => el.keyframes[k].length > 0)
 
   return (
-    <div className={cn('rounded-lg border transition-all overflow-hidden', isActive ? 'border-orange bg-bg/30 shadow-glow' : 'border-line bg-surface/40 hover:border-ink-faint')}>
+    <div className={cn('rounded-lg transition-all overflow-hidden', isActive ? 'border border-orange bg-bg/40 shadow-glow' : 'bg-surface/30 hover:bg-surface/60')}>
       {/* Header — click to expand/collapse */}
       <button
         onClick={onSelect}
-        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left"
+        className="flex w-full items-center gap-2.5 px-3 py-3 text-left min-h-11"
       >
         <span className="h-4 w-4 shrink-0 rounded ring-1 ring-black/40" style={{ background: el.color }} />
         <span className="flex-1 truncate text-[13px] font-medium">{el.name || el.kind}</span>
@@ -309,7 +310,7 @@ function PartRow({
 
       {/* Body — visible only when selected */}
       {isActive && (
-        <div className="border-t border-line/60 bg-bg-deep/40 px-3 py-3 space-y-3">
+        <div className="bg-bg-deep/40 px-3 py-3 space-y-3">
           {/* Name + delete + color */}
           <div className="grid grid-cols-[1fr_2.5rem_2.5rem] gap-2 items-center">
             <input
@@ -426,7 +427,7 @@ function ExpressionMeta({
 }: { expr: Expression | undefined; doc: FaceDoc; onMutate: (key: 'id' | 'name' | 'duration', v: any) => void; onSelect: (id: string) => void; onDelete: () => void }) {
   if (!expr) return null
   return (
-    <div className="border-b border-line/60 p-3 md:p-4 space-y-2.5">
+    <div className="p-3 md:p-4 space-y-2.5">
       <div className="flex items-baseline justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">Expression</span>
         <span className="font-display text-lg italic text-orange truncate max-w-[60%]">{expr.name}</span>
@@ -696,12 +697,12 @@ export default function App() {
   )
 
   return (
-    <div className="flex h-[100dvh] w-full max-w-[100vw] flex-col overflow-hidden bg-bg">
+    <div className="flex min-h-[100dvh] w-full max-w-[100vw] flex-col bg-bg">
       {/* atmosphere */}
       <div className="pointer-events-none fixed inset-0 z-[999]" style={{ backgroundImage: 'radial-gradient(ellipse at 75% -10%, oklch(0.78 0.18 55 / 0.10), transparent 50%), radial-gradient(ellipse at -10% 90%, oklch(0.50 0.10 30 / 0.06), transparent 55%)' }} />
 
       {/* Top bar */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-line bg-gradient-to-b from-surface to-bg px-3 py-2.5 md:px-5 md:py-3 shrink-0">
+      <header className="flex flex-wrap items-center gap-2 bg-gradient-to-b from-surface to-bg px-3 py-2.5 md:px-5 md:py-3 shrink-0">
         <div className="flex items-baseline gap-2">
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange to-orange-deep text-ink-deep shadow-glow ring-1 ring-white/10">🐻</span>
           <h1 className="font-display text-xl md:text-2xl leading-none">atticus <em className="not-italic text-orange italic font-display">face</em></h1>
@@ -730,19 +731,19 @@ export default function App() {
         onAdd={addExpression}
       />
 
-      {/* Body: desktop = stage + sidebar | mobile = stack */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[1fr_auto] md:grid-cols-[1fr_22rem] md:grid-rows-1 max-w-full overflow-hidden">
-        <main className="flex min-h-0 flex-col overflow-hidden bg-gradient-to-b from-bg via-bg to-bg-deep">
+      {/* Body: mobile = scrolling page | desktop = stage + sidebar */}
+      <div className="flex-1 min-h-0 md:grid md:grid-cols-[1fr_22rem] max-w-full md:overflow-hidden overflow-y-auto">
+        <main className="flex min-h-0 flex-col bg-gradient-to-b from-bg via-bg to-bg-deep md:overflow-hidden">
           <Stage
             doc={doc} expr={activeExpr} t={playT} selectionId={activeElemId}
             onSelect={setActiveElemId}
             onDragElem={(id, x, y) => mutateAnyElem(id, (el) => { el.x = x; el.y = y })}
           />
-          <div className="border-y border-line bg-bg-deep px-4 py-2 flex flex-wrap gap-x-5 gap-y-1 text-[10px] font-mono text-ink-faint shrink-0">
+          <div className="px-4 py-2 flex flex-wrap gap-x-5 gap-y-1 text-[10px] font-mono text-ink-faint shrink-0">
             <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">expr</span><b className="text-orange font-medium">{activeExpr?.name ?? '—'}</b></span>
             <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">selected</span><b className="text-ink font-medium">{activeElem?.name ?? 'tap a part'}</b></span>
           </div>
-          <div className="flex items-center gap-2 bg-bg-deep px-4 py-2 shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2 shrink-0">
             <Button size="icon" variant="primary" onClick={() => setPlaying((p) => !p)} disabled={(activeExpr?.duration ?? 0) === 0} aria-label={playing ? 'pause' : 'play'}>
               {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
@@ -752,17 +753,10 @@ export default function App() {
           </div>
         </main>
 
-        {/* Inspector — desktop sidebar */}
-        <aside className="hidden md:block border-l border-line bg-bg-deep overflow-y-auto">
+        {/* Inspector — desktop sidebar (scrolls), mobile inline (no fixed sheet) */}
+        <aside className="bg-bg-deep md:border-l md:border-line md:overflow-y-auto">
           {inspector}
         </aside>
-
-        {/* Inspector — mobile bottom panel (no tabs; one scrollable area) */}
-        <section className="md:hidden flex flex-col border-t border-line bg-bg-deep min-h-0 shadow-[0_-8px_24px_rgba(0,0,0,0.4)]" style={{ height: '48dvh', maxHeight: '60dvh' }}>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {inspector}
-          </div>
-        </section>
       </div>
 
       {/* Export modal */}
