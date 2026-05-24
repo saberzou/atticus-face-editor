@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { font-family: theme('fontFamily.sans'); }
+
+input[type="number"], input[type="text"] { font-size: 16px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: theme('colors.line.DEFAULT'); border-radius: 999px; border: 2px solid theme('colors.bg.deep'); }
+::-webkit-scrollbar-thumb:hover { background: theme('colors.ink.faint'); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
