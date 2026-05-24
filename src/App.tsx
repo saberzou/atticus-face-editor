@@ -731,8 +731,8 @@ export default function App() {
         onAdd={addExpression}
       />
 
-      {/* Body: mobile = scrolling page | desktop = stage + sidebar */}
-      <div className="flex-1 min-h-0 md:grid md:grid-cols-[1fr_22rem] max-w-full md:overflow-hidden overflow-y-auto">
+      {/* Body: mobile = page scrolls naturally | desktop = stage + sidebar */}
+      <div className="flex-1 min-h-0 md:grid md:grid-cols-[1fr_22rem] max-w-full md:overflow-hidden">
         <main className="flex min-h-0 flex-col bg-gradient-to-b from-bg via-bg to-bg-deep md:overflow-hidden">
           <Stage
             doc={doc} expr={activeExpr} t={playT} selectionId={activeElemId}
