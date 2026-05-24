@@ -482,21 +482,26 @@
       display: flex; flex-direction: column; min-height: 0;
       box-shadow: 0 -8px 24px oklch(0 0 0 / 0.4);
     }
+    /* Segmented-control style: every tab visibly clickable, pill highlights the active one */
     .sheet-tabs {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      background: var(--surface); border-bottom: 1px solid var(--line);
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;
+      padding: 8px; background: var(--bg);
+      border-bottom: 1px solid var(--line);
       position: sticky; top: 0; z-index: 5;
     }
     .sheet-tabs button {
-      padding: 14px 8px; color: var(--ink-dim);
-      font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: 0.14em;
-      border-bottom: 2px solid transparent; min-height: 48px;
-      transition: all .15s; position: relative;
+      padding: 12px 6px; color: var(--ink-dim);
+      font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: 0.12em;
+      min-height: 44px; border-radius: var(--r-sm);
+      background: var(--surface); border: 1px solid var(--line);
+      transition: all .15s;
     }
-    .sheet-tabs button + button { border-left: 1px solid var(--line-soft); }
+    .sheet-tabs button:active { transform: scale(0.97); }
     .sheet-tabs button.active {
-      color: var(--orange); border-bottom-color: var(--orange);
-      background: var(--bg-deep);
+      color: oklch(0.16 0.05 50);
+      background: linear-gradient(180deg, var(--orange) 0%, var(--orange-deep) 100%);
+      border-color: var(--orange-deep);
+      box-shadow: 0 4px 12px var(--orange-glow);
     }
     .sheet-body { flex: 1; overflow-y: auto; min-height: 0; }
     .sheet-body .group { padding: 14px 16px; }
