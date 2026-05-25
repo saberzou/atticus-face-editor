@@ -103,7 +103,8 @@ export function NumberField({
       <BaseNumberField.ScrubArea
         direction="horizontal"
         pixelSensitivity={2}
-        className="select-none cursor-ew-resize flex items-center justify-center h-11 md:h-9 w-7 rounded-l-md border border-r-0 border-line bg-surface/60 text-ink-faint text-[10px] font-mono uppercase tracking-wider hover:border-orange hover:text-orange transition-colors data-[scrubbing]:bg-orange data-[scrubbing]:text-ink-deep data-[scrubbing]:border-orange"
+        className="select-none cursor-ew-resize flex items-center justify-center h-11 md:h-9 w-9 rounded-l-md border border-r-0 border-line bg-surface text-orange/70 hover:bg-orange/10 hover:text-orange hover:border-orange transition-colors data-[scrubbing]:bg-orange data-[scrubbing]:text-ink-deep data-[scrubbing]:border-orange"
+        title="Drag to scrub"
       >
         <BaseNumberField.ScrubAreaCursor
           className="z-[200] text-orange"
@@ -112,7 +113,7 @@ export function NumberField({
             <path d="M19.5 5.5L6.49737 5.51844V2L1 6.9999L6.5 12L6.49737 8.5L19.5 8.5V12L25 6.9999L19.5 2V5.5Z" />
           </svg>
         </BaseNumberField.ScrubAreaCursor>
-        <span aria-hidden>{scrubLabel ?? '↔'}</span>
+        <span aria-hidden className="text-sm font-bold leading-none pointer-events-none">{scrubLabel ?? '↔'}</span>
       </BaseNumberField.ScrubArea>
       <BaseNumberField.Group className="flex-1 flex items-stretch">
         <BaseNumberField.Input
