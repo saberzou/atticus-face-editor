@@ -639,7 +639,7 @@ function useToasts() {
  * ============================================================ */
 export default function App() {
   const [doc, setDoc] = useState<FaceDoc>(() => {
-    try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); if (p?.expressions?.length) return p } } catch {}
+    try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) { const p = JSON.parse(raw); if (p?.expressions?.length && (p.version ?? 0) >= 4) return p } } catch {}
     return seedDoc()
   })
   const [activeExprId, setActiveExprId] = useState(doc.expressions[0].id)
