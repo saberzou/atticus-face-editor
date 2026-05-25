@@ -1,17 +1,34 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Play, Pause, Square, Save, FolderOpen, Upload, Code2, Braces, Copy, X, Plus, Trash2, Diamond, ChevronDown } from 'lucide-react'
+import { Play, Pause, Square, Save, FolderOpen, Upload, Code2, Braces, Copy, X, Plus, Trash2, Diamond, ChevronDown, Grid3x3, FlipHorizontal2 } from 'lucide-react'
 import { Button, Slider, Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from './lib/ui'
 import { cn, uid } from './lib/util'
 import {
   type FaceDoc, type Expression, type FaceElement, type Kind,
-  LCD_W, LCD_H, DEFAULT_COLORS, seedDoc, drawDoc, hitTest, generateC,
+  LCD_W, LCD_H, DEFAULT_COLORS, seedDoc, drawDoc, hitTest, generateC, elemAt,
 } from './lib/face'
 
 const STORAGE_KEY = 'atticus-face-studio-v3'
 
+// Grid configuration: 64 cols × 48 rows over 320×240 face = 5px per cell.
+const GRID_COLS = 64
+const GRID_ROWS = 48
+const CELL_W = LCD_W / GRID_COLS // 5
+const CELL_H = LCD_H / GRID_ROWS // 5
+
+const snap = (v: number, cell: number) => Math.round(v / cell) * cell
+const snapX = (v: number) => snap(v, CELL_W)
+const snapY = (v: number) => snap(v, CELL_H)
+const mirrorXcenter = (cx: number) => LCD_W - cx
+const mirrorXrect = (x: number, w: number) => LCD_W - x - w
+
+function findMirrorRole(role: string): string | null {
+  if (role.startsWith('left')) return 'right' + role.slice(4)
+  if (role.startsWith('right')) return 'left' + role.slice(5)
+  return null
+}
+
 /* ============================================================
- * Numeric input: slider + tap-to-edit field
- * Tap the number → text field opens; commit on blur or Enter
+ * NumberField: tap-to-type fallback for sub-cell precision
  * ============================================================ */
 function NumberField({
   value, min, max, step = 1, onChange, className,
@@ -41,7 +58,7 @@ function NumberField({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.currentTarget.blur() }
+          if (e.key === 'Enter') e.currentTarget.blur()
           else if (e.key === 'Escape') { setDraft(String(Math.round(value))); setEditing(false) }
         }}
         className={cn('h-11 md:h-10 w-full rounded-md bg-surface border border-orange px-2 text-right font-mono text-base md:text-xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-orange', className)}
@@ -52,7 +69,7 @@ function NumberField({
     <button
       type="button"
       onClick={() => setEditing(true)}
-      className={cn('h-11 md:h-9 w-full rounded-md bg-surface/60 border border-line px-2 text-right font-mono text-xs text-ink-dim hover:border-orange hover:text-ink transition-colors duration-150 ease-quart focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange', className)}
+      className={cn('h-11 md:h-9 w-full rounded-md bg-surface/60 border border-line px-2 text-right font-mono text-xs text-ink-dim hover:border-orange hover:text-ink transition-colors', className)}
       title="Tap to type exact value"
     >
       {Math.round(value)}
@@ -61,32 +78,57 @@ function NumberField({
 }
 
 /* ============================================================
- * Stage canvas
+ * GridStage — the new canvas.
+ * - 64×48 grid overlay (toggleable)
+ * - Tap to select / drag to move (snapped)
+ * - Corner handles to resize (snapped)
+ * - Symmetry mirrors edits across vertical centerline
+ * - Long-press on empty grid places currently-selected part type
  * ============================================================ */
-function Stage({
-  doc, expr, t, selectionId, onSelect, onDragElem,
+
+type HandleKind = 'move' | 'nw' | 'ne' | 'sw' | 'se'
+
+function getElementBounds(el: FaceElement, t: number) {
+  const e = elemAt(el, t)
+  if (e.kind === 'ellipse') {
+    const rx = (e.w ?? 0) / 2, ry = (e.h ?? 0) / 2
+    return { x: e.x - rx, y: e.y - ry, w: e.w ?? 0, h: e.h ?? 0, cx: e.x, cy: e.y }
+  }
+  if (e.kind === 'rect') {
+    return { x: e.x, y: e.y, w: e.w ?? 0, h: e.h ?? 0, cx: e.x + (e.w ?? 0) / 2, cy: e.y + (e.h ?? 0) / 2 }
+  }
+  // arc — bounded by 2r square centered at e.x,e.y
+  const r = e.r ?? 0
+  return { x: e.x - r, y: e.y - r, w: r * 2, h: r * 2, cx: e.x, cy: e.y }
+}
+
+function GridStage({
+  doc, expr, t, selectionId, showGrid, symmetry,
+  onSelect, onMoveElem, onResizeElem, onPlace, placingKind,
 }: {
   doc: FaceDoc
   expr: Expression | undefined
   t: number
   selectionId: string | null
+  showGrid: boolean
+  symmetry: boolean
   onSelect: (id: string | null) => void
-  onDragElem: (id: string, x: number, y: number) => void
+  onMoveElem: (id: string, dx: number, dy: number) => void
+  onResizeElem: (id: string, handle: HandleKind, x: number, y: number) => void
+  onPlace: (kind: Kind, x: number, y: number) => void
+  placingKind: Kind | null
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const dragRef = useRef<{ id: string; dx: number; dy: number } | null>(null)
+  const dragRef = useRef<{ id: string; kind: HandleKind; startX: number; startY: number; lastX: number; lastY: number } | null>(null)
   const [size, setSize] = useState({ w: 320, h: 240 })
 
-  // Measure the actual rendered (aspect-locked) box and sync canvas backing.
   useEffect(() => {
     if (!wrapRef.current) return
     const ro = new ResizeObserver(() => {
       if (!wrapRef.current) return
       const r = wrapRef.current.getBoundingClientRect()
-      const w = Math.max(80, Math.round(r.width))
-      const h = Math.max(60, Math.round(r.height))
-      setSize({ w, h })
+      setSize({ w: Math.max(80, Math.round(r.width)), h: Math.max(60, Math.round(r.height)) })
     })
     ro.observe(wrapRef.current)
     return () => ro.disconnect()
@@ -99,13 +141,84 @@ function Stage({
     canvas.width = size.w * dpr
     canvas.height = size.h * dpr
     const ctx = canvas.getContext('2d')!
-    drawDoc(ctx, canvas.width, canvas.height, doc, expr, t, selectionId, true)
-  }, [size, doc, expr, t, selectionId])
+    drawDoc(ctx, canvas.width, canvas.height, doc, expr, t, null, false)
+
+    if (showGrid) {
+      const sx = canvas.width / LCD_W, sy = canvas.height / LCD_H
+      ctx.strokeStyle = 'rgba(255,138,43,0.10)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let c = 0; c <= GRID_COLS; c++) {
+        const x = Math.round(c * CELL_W * sx) + 0.5
+        ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height)
+      }
+      for (let r = 0; r <= GRID_ROWS; r++) {
+        const y = Math.round(r * CELL_H * sy) + 0.5
+        ctx.moveTo(0, y); ctx.lineTo(canvas.width, y)
+      }
+      ctx.stroke()
+      // centerline accent (symmetry axis)
+      ctx.strokeStyle = 'rgba(255,138,43,0.32)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      const cx = Math.round((LCD_W / 2) * sx) + 0.5
+      ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height); ctx.stroke()
+    }
+
+    // selection outline + handles (drawn last)
+    if (selectionId && expr) {
+      const el = expr.elements.find((x) => x.id === selectionId)
+      if (el) {
+        const b = getElementBounds(el, t)
+        const sx = canvas.width / LCD_W, sy = canvas.height / LCD_H
+        ctx.save()
+        ctx.strokeStyle = '#ff8a2b'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([4, 3])
+        ctx.strokeRect(b.x * sx, b.y * sy, b.w * sx, b.h * sy)
+        ctx.setLineDash([])
+        // handles
+        const handleR = Math.max(7, 9 * Math.min(sx, sy))
+        const drawHandle = (px: number, py: number) => {
+          ctx.fillStyle = '#ff8a2b'
+          ctx.strokeStyle = '#1a1a1a'
+          ctx.lineWidth = 2
+          ctx.beginPath()
+          ctx.arc(px * sx, py * sy, handleR, 0, Math.PI * 2)
+          ctx.fill(); ctx.stroke()
+        }
+        drawHandle(b.x, b.y)
+        drawHandle(b.x + b.w, b.y)
+        drawHandle(b.x, b.y + b.h)
+        drawHandle(b.x + b.w, b.y + b.h)
+        ctx.restore()
+      }
+    }
+  }, [size, doc, expr, t, selectionId, showGrid])
 
   const eventToLcd = useCallback((ev: React.PointerEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect()
-    return { x: ((ev.clientX - rect.left) / rect.width) * LCD_W, y: ((ev.clientY - rect.top) / rect.height) * LCD_H }
+    return {
+      x: ((ev.clientX - rect.left) / rect.width) * LCD_W,
+      y: ((ev.clientY - rect.top) / rect.height) * LCD_H,
+    }
   }, [])
+
+  // Detect which handle was tapped (if any) for selected element
+  const handleHit = useCallback((p: { x: number; y: number }): HandleKind | null => {
+    if (!selectionId || !expr) return null
+    const el = expr.elements.find((x) => x.id === selectionId)
+    if (!el) return null
+    const b = getElementBounds(el, t)
+    // 14px tolerance in LCD units = ~3 cells; generous for touch
+    const tol = 14
+    const near = (hx: number, hy: number) => Math.abs(p.x - hx) <= tol && Math.abs(p.y - hy) <= tol
+    if (near(b.x, b.y)) return 'nw'
+    if (near(b.x + b.w, b.y)) return 'ne'
+    if (near(b.x, b.y + b.h)) return 'sw'
+    if (near(b.x + b.w, b.y + b.h)) return 'se'
+    return null
+  }, [selectionId, expr, t])
 
   return (
     <div className="shrink-0 p-3 md:p-5 max-w-full overflow-hidden">
@@ -120,26 +233,63 @@ function Stage({
           onPointerDown={(ev) => {
             (ev.target as Element).setPointerCapture(ev.pointerId)
             const p = eventToLcd(ev)
+            // 1) Handle hit takes priority
+            const h = handleHit(p)
+            if (h) {
+              dragRef.current = { id: selectionId!, kind: h, startX: p.x, startY: p.y, lastX: p.x, lastY: p.y }
+              return
+            }
+            // 2) Element hit → select + start move drag
             const hit = expr ? hitTest(expr, p, t) : null
-            if (hit) { onSelect(hit.id); dragRef.current = { id: hit.id, dx: p.x - hit.x, dy: p.y - hit.y } }
-            else { onSelect(null); dragRef.current = null }
+            if (hit) {
+              onSelect(hit.id)
+              dragRef.current = { id: hit.id, kind: 'move', startX: p.x, startY: p.y, lastX: p.x, lastY: p.y }
+              return
+            }
+            // 3) Empty: if a placingKind is armed, place it (snapped). Otherwise deselect.
+            if (placingKind) {
+              onPlace(placingKind, snapX(p.x), snapY(p.y))
+            } else {
+              onSelect(null)
+            }
+            dragRef.current = null
           }}
           onPointerMove={(ev) => {
             const d = dragRef.current
-            if (!d || !expr) return
+            if (!d) return
             const p = eventToLcd(ev)
-            onDragElem(d.id, Math.round(p.x - d.dx), Math.round(p.y - d.dy))
+            if (d.kind === 'move') {
+              const dx = snapX(p.x) - snapX(d.lastX)
+              const dy = snapY(p.y) - snapY(d.lastY)
+              if (dx !== 0 || dy !== 0) {
+                onMoveElem(d.id, dx, dy)
+                d.lastX += dx; d.lastY += dy
+              }
+            } else {
+              onResizeElem(d.id, d.kind, snapX(p.x), snapY(p.y))
+            }
           }}
           onPointerUp={() => { dragRef.current = null }}
           onPointerCancel={() => { dragRef.current = null }}
         />
+        {/* Visible hint for armed placement */}
+        {placingKind && (
+          <div className="pointer-events-none absolute left-2 top-2 rounded-md bg-orange/90 px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-ink-deep shadow-glow">
+            tap to place {placingKind}
+          </div>
+        )}
+        {symmetry && (
+          <div className="pointer-events-none absolute right-2 top-2 rounded-md bg-surface/80 backdrop-blur px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-orange ring-1 ring-orange/40">
+            symmetry on
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 /* ============================================================
- * Expression thumbnail
+ * Expression thumbnail (used in switcher)
  * ============================================================ */
 function ExprThumb({ doc, expr, w, h }: { doc: FaceDoc; expr: Expression; w: number; h: number }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -155,8 +305,7 @@ function ExprThumb({ doc, expr, w, h }: { doc: FaceDoc; expr: Expression; w: num
 }
 
 /* ============================================================
- * Expression switcher — horizontal strip, sits above the stage
- * Top-level navigation. Visible on every screen size.
+ * Expression switcher
  * ============================================================ */
 function ExpressionSwitcher({
   doc, activeId, onSelect, onAdd,
@@ -201,13 +350,16 @@ function ExpressionSwitcher({
 }
 
 /* ============================================================
- * Unified Parts + Properties inspector
- * Selected part expands inline (accordion). No tab-switching.
+ * Parts list (replaces slider-heavy inspector)
+ * - Tap row → select on canvas
+ * - Expand → name, color, delete, keyframe tracks
+ * - No spatial sliders (those are on canvas now)
+ * - Keyframe tracks remain (animation is timing data, not spatial)
  * ============================================================ */
-function PartsInspector({
+function PartsList({
   expr, activeElemId, playT,
-  onSelect, onDelete, onAdd,
-  onChange, onColor, onRename, onToggleKf,
+  onSelect, onDelete,
+  onColor, onRename, onToggleKf,
   onClearTrack, onSetKfValue, onSetKfTime, onRemoveKf,
 }: {
   expr: Expression | undefined
@@ -215,8 +367,6 @@ function PartsInspector({
   playT: number
   onSelect: (id: string | null) => void
   onDelete: (id: string) => void
-  onAdd: (kind: Kind) => void
-  onChange: (prop: string, v: number) => void
   onColor: (c: string) => void
   onRename: (n: string) => void
   onToggleKf: (prop: string) => void
@@ -228,35 +378,23 @@ function PartsInspector({
   if (!expr) return null
   return (
     <div className="p-3 md:p-4 space-y-3">
-      {/* Add-row first, low-friction */}
-      <div className="grid grid-cols-3 gap-2">
-        {(['ellipse', 'rect', 'arc'] as Kind[]).map((k) => (
-          <Button key={k} variant="outline" size="sm" onClick={() => onAdd(k)} className="font-medium uppercase tracking-wider text-[11px]">
-            <Plus className="h-3 w-3" /> {k}
-          </Button>
-        ))}
-      </div>
-
       {expr.elements.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line py-8 text-center text-ink-faint">
           <div className="font-display text-xl italic text-ink-dim">Empty face</div>
-          <div className="text-sm mt-1">Add a part above to start.</div>
+          <div className="text-sm mt-1">Pick a part type below the canvas and tap to place.</div>
         </div>
       ) : (
         <div className="space-y-1.5">
           {expr.elements.map((el) => {
-            const hasKf = Object.keys(el.keyframes || {}).length > 0
             const isActive = el.id === activeElemId
             return (
               <PartRow
                 key={el.id}
                 el={el}
                 isActive={isActive}
-                hasKf={hasKf}
                 playT={playT}
                 onSelect={() => onSelect(isActive ? null : el.id)}
                 onDelete={() => onDelete(el.id)}
-                onChange={onChange}
                 onColor={onColor}
                 onRename={onRename}
                 onToggleKf={onToggleKf}
@@ -274,29 +412,31 @@ function PartsInspector({
 }
 
 function PartRow({
-  el, isActive, hasKf, playT,
-  onSelect, onDelete, onChange, onColor, onRename, onToggleKf,
+  el, isActive, playT,
+  onSelect, onDelete, onColor, onRename, onToggleKf,
   onClearTrack, onSetKfValue, onSetKfTime, onRemoveKf,
 }: {
-  el: FaceElement; isActive: boolean; hasKf: boolean; playT: number
+  el: FaceElement; isActive: boolean; playT: number
   onSelect: () => void; onDelete: () => void
-  onChange: (p: string, v: number) => void; onColor: (c: string) => void; onRename: (n: string) => void
+  onColor: (c: string) => void; onRename: (n: string) => void
   onToggleKf: (p: string) => void; onClearTrack: (p: string) => void
   onSetKfValue: (p: string, i: number, v: any) => void
   onSetKfTime: (p: string, i: number, t: number) => void
   onRemoveKf: (p: string, i: number) => void
 }) {
-  const propsByKind: Record<Kind, Array<[string, number, number]>> = {
-    ellipse: [['x', 0, LCD_W], ['y', 0, LCD_H], ['w', 2, LCD_W * 2], ['h', 2, LCD_H * 2]],
-    rect: [['x', 0, LCD_W], ['y', 0, LCD_H], ['w', 2, LCD_W], ['h', 2, LCD_H]],
-    arc: [['x', 0, LCD_W], ['y', 0, LCD_H], ['r', 2, 200], ['thick', 1, 40], ['start', -360, 360], ['end', -360, 360]],
+  // Properties that make sense to keyframe per kind (spatial values are still keyframeable,
+  // but you set the value on canvas, then hit the diamond to record at playhead.)
+  const kfProps: Record<Kind, string[]> = {
+    ellipse: ['x', 'y', 'w', 'h'],
+    rect: ['x', 'y', 'w', 'h'],
+    arc: ['x', 'y', 'r', 'thick', 'start', 'end'],
   }
+  const hasKf = Object.keys(el.keyframes || {}).length > 0
   const hasColorKf = !!el.keyframes?.color?.length
   const tracks = Object.keys(el.keyframes || {}).filter((k) => el.keyframes[k].length > 0)
 
   return (
     <div className={cn('rounded-lg transition-all overflow-hidden', isActive ? 'border border-orange bg-bg/40 shadow-glow' : 'bg-surface/30 hover:bg-surface/60')}>
-      {/* Header — click to expand/collapse */}
       <button
         onClick={onSelect}
         className="flex w-full items-center gap-2.5 px-3 py-3 text-left min-h-11"
@@ -308,10 +448,9 @@ function PartRow({
         <ChevronDown className={cn('h-4 w-4 text-ink-faint transition-transform shrink-0', isActive && 'rotate-180')} />
       </button>
 
-      {/* Body — visible only when selected */}
       {isActive && (
         <div className="bg-bg-deep/40 px-3 py-3 space-y-3">
-          {/* Name + delete + color */}
+          {/* name + color + delete */}
           <div className="grid grid-cols-[1fr_2.5rem_2.5rem] gap-2 items-center">
             <input
               type="text"
@@ -331,51 +470,46 @@ function PartRow({
             </div>
             <button
               onClick={onDelete}
-              className="h-11 md:h-9 rounded-md border border-line text-ink-faint hover:border-bad hover:text-bad transition-colors duration-150 ease-quart"
+              className="h-11 md:h-9 rounded-md border border-line text-ink-faint hover:border-bad hover:text-bad transition-colors"
               aria-label="delete part"
             >
               <Trash2 className="h-4 w-4 mx-auto" />
             </button>
           </div>
 
-          {/* Property sliders */}
-          <div className="space-y-2">
-            {propsByKind[el.kind].map(([p, lo, hi]) => {
-              const v = (el as any)[p] ?? 0
-              const hasPropKf = !!el.keyframes?.[p]?.length
-              return (
-                <div key={p} className="grid grid-cols-[2.25rem_1fr_3.5rem_2.25rem] items-center gap-2">
-                  <label className="text-[10px] font-mono uppercase tracking-wider text-ink-faint">{p}</label>
-                  <Slider min={lo} max={hi} step={1} value={[v]} onValueChange={(val) => onChange(p, val[0])} />
-                  <NumberField value={v} min={lo} max={hi} onChange={(n) => onChange(p, n)} />
+          {/* keyframe-at-playhead row */}
+          <div className="rounded-md border border-line bg-surface/40 p-2.5 space-y-1.5">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-ink-faint">Animate at playhead</div>
+            <div className="flex flex-wrap gap-1.5">
+              {kfProps[el.kind].map((p) => {
+                const has = !!el.keyframes?.[p]?.length
+                return (
                   <button
+                    key={p}
                     onClick={() => onToggleKf(p)}
-                    title={hasPropKf ? 'has keyframes — set at playhead' : 'set keyframe at playhead'}
+                    title={has ? `${p} has keyframes — set at playhead` : `set ${p} keyframe at playhead`}
                     className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-md border transition-all',
-                      hasPropKf ? 'bg-good/20 border-good/60 text-good' : 'border-line text-ink-faint hover:border-orange hover:text-orange',
+                      'flex items-center gap-1 h-9 px-2.5 rounded-md border text-[11px] font-mono uppercase tracking-wider transition-all',
+                      has ? 'bg-good/20 border-good/60 text-good' : 'border-line text-ink-faint hover:border-orange hover:text-orange',
                     )}
                   >
-                    <Diamond className="h-3.5 w-3.5" fill={hasPropKf ? 'currentColor' : 'none'} />
+                    <Diamond className="h-3 w-3" fill={has ? 'currentColor' : 'none'} /> {p}
                   </button>
-                </div>
-              )
-            })}
+                )
+              })}
+              <button
+                onClick={() => onToggleKf('color')}
+                title={hasColorKf ? 'color has keyframes' : 'set color keyframe at playhead'}
+                className={cn(
+                  'flex items-center gap-1 h-9 px-2.5 rounded-md border text-[11px] font-mono uppercase tracking-wider transition-all',
+                  hasColorKf ? 'bg-good/20 border-good/60 text-good' : 'border-line text-ink-faint hover:border-orange hover:text-orange',
+                )}
+              >
+                <Diamond className="h-3 w-3" fill={hasColorKf ? 'currentColor' : 'none'} /> color
+              </button>
+            </div>
           </div>
 
-          {/* Color keyframe toggle */}
-          <div className="grid grid-cols-[2.25rem_1fr_2.25rem] items-center gap-2">
-            <label className="text-[10px] font-mono uppercase tracking-wider text-ink-faint">color</label>
-            <span className="text-[11px] text-ink-dim">Animate color over time</span>
-            <button
-              onClick={() => onToggleKf('color')}
-              className={cn('flex h-9 w-9 items-center justify-center rounded-md border transition-all', hasColorKf ? 'bg-good/20 border-good/60 text-good' : 'border-line text-ink-faint hover:border-orange hover:text-orange')}
-            >
-              <Diamond className="h-3.5 w-3.5" fill={hasColorKf ? 'currentColor' : 'none'} />
-            </button>
-          </div>
-
-          {/* Keyframe tracks */}
           {tracks.length > 0 && (
             <div className="border-t border-dashed border-line pt-3 space-y-3">
               {tracks.map((k) => (
@@ -391,7 +525,7 @@ function PartRow({
                       const isColor = typeof kf.v === 'string'
                       return (
                         <div key={i} className="grid grid-cols-[4rem_1fr_1.75rem] items-center gap-1.5">
-                          <NumberField value={kf.t} min={0} max={60000} step={10} onChange={(t) => onSetKfTime(k, i, t)} className="text-orange" />
+                          <NumberField value={kf.t} min={0} max={60000} step={10} onChange={(tt) => onSetKfTime(k, i, tt)} className="text-orange" />
                           {isColor ? (
                             <input
                               type="color"
@@ -420,11 +554,11 @@ function PartRow({
 }
 
 /* ============================================================
- * Expression meta panel (sits at top of inspector)
+ * Expression meta
  * ============================================================ */
 function ExpressionMeta({
-  expr, doc, onMutate, onSelect, onDelete,
-}: { expr: Expression | undefined; doc: FaceDoc; onMutate: (key: 'id' | 'name' | 'duration', v: any) => void; onSelect: (id: string) => void; onDelete: () => void }) {
+  expr, onMutate, onSelect, onDelete,
+}: { expr: Expression | undefined; onMutate: (key: 'id' | 'name' | 'duration', v: any) => void; onSelect: (id: string) => void; onDelete: () => void }) {
   if (!expr) return null
   return (
     <div className="p-3 md:p-4 space-y-2.5">
@@ -462,7 +596,6 @@ function ExpressionMeta({
             const c = structuredClone(expr)
             c.id = expr.id + '-copy'; c.name = expr.name + ' copy'
             c.elements.forEach((el) => { el.id = uid() })
-            // tell parent to add
             const ev = new CustomEvent('atticus:duplicate-expr', { detail: c })
             window.dispatchEvent(ev)
             onSelect(c.id)
@@ -511,6 +644,10 @@ export default function App() {
   })
   const [activeExprId, setActiveExprId] = useState(doc.expressions[0].id)
   const [activeElemId, setActiveElemId] = useState<string | null>(null)
+  const [placingKind, setPlacingKind] = useState<Kind | null>(null)
+  const [showGrid, setShowGrid] = useState(true)
+  const [symmetry, setSymmetry] = useState(true)
+
   const [playing, setPlaying] = useState(false)
   const [playT, setPlayT] = useState(0)
   const playStartRef = useRef(0)
@@ -531,7 +668,13 @@ export default function App() {
   const mutate = (fn: (d: FaceDoc) => void) => setDoc((prev) => { const next = structuredClone(prev) as FaceDoc; fn(next); return next })
   const mutateElem = (fn: (el: FaceElement) => void) => mutate((d) => { const ex = d.expressions.find((e) => e.id === activeExprId); const el = ex?.elements.find((e) => e.id === activeElemId); if (el) fn(el) })
   const mutateExpr = (fn: (ex: Expression) => void) => mutate((d) => { const ex = d.expressions.find((e) => e.id === activeExprId); if (ex) fn(ex) })
-  const mutateAnyElem = (id: string, fn: (el: FaceElement) => void) => mutate((d) => { const ex = d.expressions.find((e) => e.id === activeExprId); const el = ex?.elements.find((e) => e.id === id); if (el) fn(el) })
+
+  // Resolve mirror partner element (by role) within current expr.
+  const findMirrorElem = (ex: Expression, el: FaceElement): FaceElement | null => {
+    const mirrorRole = findMirrorRole(el.role)
+    if (!mirrorRole) return null
+    return ex.elements.find((e) => e.role === mirrorRole && e.id !== el.id) ?? null
+  }
 
   /* play loop */
   useEffect(() => {
@@ -564,29 +707,32 @@ export default function App() {
   }, [liveOn, liveCfg, activeExprId, playT, doc])
   useEffect(() => { pushLive() }, [pushLive])
 
-  /* keyboard nudges */
+  /* keyboard nudges (1-cell steps; Shift = 4 cells) */
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       const tgt = ev.target as HTMLElement
       if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA')) return
       if (!activeElem) return
-      const step = ev.shiftKey ? 10 : 1
+      const sx = ev.shiftKey ? CELL_W * 4 : CELL_W
+      const sy = ev.shiftKey ? CELL_H * 4 : CELL_H
       let handled = true
-      if (ev.key === 'ArrowLeft') mutateElem((el) => { el.x -= step })
-      else if (ev.key === 'ArrowRight') mutateElem((el) => { el.x += step })
-      else if (ev.key === 'ArrowUp') mutateElem((el) => { el.y -= step })
-      else if (ev.key === 'ArrowDown') mutateElem((el) => { el.y += step })
+      if (ev.key === 'ArrowLeft') moveElem(activeElem.id, -sx, 0)
+      else if (ev.key === 'ArrowRight') moveElem(activeElem.id, sx, 0)
+      else if (ev.key === 'ArrowUp') moveElem(activeElem.id, 0, -sy)
+      else if (ev.key === 'ArrowDown') moveElem(activeElem.id, 0, sy)
       else if (ev.key === 'Delete' || ev.key === 'Backspace') {
-        mutate((d) => { const ex = d.expressions.find((e) => e.id === activeExprId); if (ex) ex.elements = ex.elements.filter((e) => e.id !== activeElemId) })
-        setActiveElemId(null)
+        deleteElement(activeElem.id)
+      } else if (ev.key === 'Escape') {
+        setPlacingKind(null); setActiveElemId(null)
       } else handled = false
       if (handled) ev.preventDefault()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeElem, activeElemId, activeExprId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeElem, activeExprId, symmetry])
 
-  /* listen for duplicate-expr event (from inline button) */
+  /* listen for duplicate-expr event */
   useEffect(() => {
     const onDup = (e: any) => mutate((d) => d.expressions.push(e.detail))
     window.addEventListener('atticus:duplicate-expr', onDup)
@@ -600,19 +746,129 @@ export default function App() {
     mutate((d) => d.expressions.push({ id, name: id, duration: 0, elements: [] }))
     setActiveExprId(id); setActiveElemId(null)
   }
-  const addElement = (kind: Kind) => {
+
+  // Place a new part snapped at (x,y). Sets reasonable default size in cells.
+  // If symmetry is on AND we're placing the first ellipse pair, tag as leftEye so
+  // mirror partner becomes rightEye and future moves stay synced by role.
+  const placeElement = (kind: Kind, x: number, y: number) => {
     const id = uid()
-    const base: FaceElement = { id, role: kind, name: kind[0].toUpperCase() + kind.slice(1), kind, color: DEFAULT_COLORS.EYE, keyframes: {}, x: 0, y: 0 }
-    if (kind === 'ellipse') Object.assign(base, { x: 160, y: 120, w: 40, h: 40 })
-    else if (kind === 'rect') Object.assign(base, { x: 140, y: 110, w: 40, h: 20 })
-    else if (kind === 'arc') Object.assign(base, { x: 160, y: 170, r: 30, thick: 5, start: 0, end: 180 })
-    mutate((d) => { const ex = d.expressions.find((e) => e.id === activeExprId); if (ex) ex.elements.push(base) })
+    const isFirstEyePair = kind === 'ellipse' && !!activeExpr && !activeExpr.elements.some((e) => e.role === 'leftEye' || e.role === 'rightEye')
+    const role = isFirstEyePair ? 'leftEye' : kind
+    // Default sizes in grid cells:
+    const dEll = { w: CELL_W * 12, h: CELL_W * 12 } // 60×60
+    const dRect = { w: CELL_W * 10, h: CELL_H * 2 } // 50×10 (closed eye / brow bar)
+    const dArc = { r: CELL_W * 6, thick: 5, start: 0, end: 180 } // r=30
+
+    const base: FaceElement = { id, role, name: role[0].toUpperCase() + role.slice(1), kind, color: DEFAULT_COLORS.EYE, keyframes: {}, x, y }
+    if (kind === 'ellipse') Object.assign(base, dEll)
+    else if (kind === 'rect') Object.assign(base, dRect)
+    else if (kind === 'arc') Object.assign(base, dArc)
+
+    mutate((d) => {
+      const ex = d.expressions.find((e) => e.id === activeExprId)
+      if (!ex) return
+      ex.elements.push(base)
+      // Mirror placement for eye/brow if symmetry on and we used left*/right* naming
+      if (symmetry && (base.role === 'leftEye' || base.role === 'leftBrow')) {
+        const m = structuredClone(base) as FaceElement
+        m.id = uid()
+        m.role = base.role.startsWith('left') ? 'right' + base.role.slice(4) : base.role
+        m.name = m.role[0].toUpperCase() + m.role.slice(1)
+        if (kind === 'rect') m.x = mirrorXrect(base.x, base.w ?? 0)
+        else m.x = mirrorXcenter(base.x)
+        ex.elements.push(m)
+      }
+    })
     setActiveElemId(id)
+    setPlacingKind(null)
   }
+
+  // Move element by (dx, dy) in LCD units. Mirrors partner when symmetry on.
+  const moveElem = (id: string, dx: number, dy: number) => {
+    mutate((d) => {
+      const ex = d.expressions.find((e) => e.id === activeExprId)
+      if (!ex) return
+      const el = ex.elements.find((e) => e.id === id)
+      if (!el) return
+      el.x = snapX(Math.max(0, Math.min(LCD_W, el.x + dx)))
+      el.y = snapY(Math.max(0, Math.min(LCD_H, el.y + dy)))
+      if (symmetry) {
+        const m = findMirrorElem(ex, el)
+        if (m) {
+          // Mirror x; keep y in sync; same size kept (no size change here)
+          if (el.kind === 'rect') m.x = snapX(mirrorXrect(el.x, el.w ?? 0))
+          else m.x = snapX(mirrorXcenter(el.x))
+          m.y = el.y
+        }
+      }
+    })
+  }
+
+  // Resize via corner handle. For ellipse/arc (center-origin), we resize symmetrically
+  // around center using the distance from center to the dragged handle.
+  // For rect (top-left origin), we resize from the opposite corner.
+  const resizeElem = (id: string, handle: HandleKind, x: number, y: number) => {
+    mutate((d) => {
+      const ex = d.expressions.find((e) => e.id === activeExprId)
+      if (!ex) return
+      const el = ex.elements.find((e) => e.id === id)
+      if (!el) return
+      const px = snapX(Math.max(0, Math.min(LCD_W, x)))
+      const py = snapY(Math.max(0, Math.min(LCD_H, y)))
+
+      if (el.kind === 'ellipse') {
+        const rx = Math.max(CELL_W, Math.abs(px - el.x))
+        const ry = Math.max(CELL_H, Math.abs(py - el.y))
+        el.w = rx * 2
+        el.h = ry * 2
+      } else if (el.kind === 'arc') {
+        const r = Math.max(CELL_W, Math.round(Math.hypot(px - el.x, py - el.y)))
+        el.r = r
+      } else if (el.kind === 'rect') {
+        // opposite corner anchor
+        const anchor = {
+          nw: { x: el.x + (el.w ?? 0), y: el.y + (el.h ?? 0) },
+          ne: { x: el.x, y: el.y + (el.h ?? 0) },
+          sw: { x: el.x + (el.w ?? 0), y: el.y },
+          se: { x: el.x, y: el.y },
+        }[handle === 'move' ? 'se' : handle]
+        const nx = Math.min(anchor.x, px)
+        const ny = Math.min(anchor.y, py)
+        const nw = Math.max(CELL_W, Math.abs(anchor.x - px))
+        const nh = Math.max(CELL_H, Math.abs(anchor.y - py))
+        el.x = snapX(nx); el.y = snapY(ny); el.w = snapX(nw); el.h = snapY(nh)
+      }
+
+      if (symmetry) {
+        const m = findMirrorElem(ex, el)
+        if (m && m.kind === el.kind) {
+          if (el.kind === 'ellipse' || el.kind === 'arc') {
+            m.w = el.w; m.h = el.h; m.r = el.r
+            m.x = snapX(mirrorXcenter(el.x)); m.y = el.y
+          } else if (el.kind === 'rect') {
+            m.w = el.w; m.h = el.h
+            m.x = snapX(mirrorXrect(el.x, el.w ?? 0)); m.y = el.y
+          }
+        }
+      }
+    })
+  }
+
   const deleteElement = (id: string) => {
-    mutate((d) => { const ex = d.expressions.find((e) => e.id === activeExprId); if (ex) ex.elements = ex.elements.filter((e) => e.id !== id) })
+    mutate((d) => {
+      const ex = d.expressions.find((e) => e.id === activeExprId)
+      if (!ex) return
+      const el = ex.elements.find((e) => e.id === id)
+      let toRemove = new Set<string>([id])
+      if (symmetry && el) {
+        const m = findMirrorElem(ex, el)
+        if (m) toRemove.add(m.id)
+      }
+      ex.elements = ex.elements.filter((e) => !toRemove.has(e.id))
+    })
     if (activeElemId === id) setActiveElemId(null)
   }
+
   const toggleKf = (prop: string) => {
     mutateElem((el) => {
       el.keyframes = el.keyframes || {}
@@ -664,12 +920,10 @@ export default function App() {
     setActiveExprId(remaining[0].id); setActiveElemId(null)
   }
 
-  /* ---------- Render ---------- */
   const inspector = (
     <>
       <ExpressionMeta
         expr={activeExpr}
-        doc={doc}
         onMutate={(k, v) => {
           mutate((d) => { const ex = d.expressions.find((x) => x.id === activeExprId); if (ex) (ex as any)[k] = v })
           if (k === 'id' && typeof v === 'string') setActiveExprId(v)
@@ -677,14 +931,12 @@ export default function App() {
         onSelect={setActiveExprId}
         onDelete={handleDeleteExpr}
       />
-      <PartsInspector
+      <PartsList
         expr={activeExpr}
         activeElemId={activeElemId}
         playT={playT}
         onSelect={setActiveElemId}
         onDelete={deleteElement}
-        onAdd={addElement}
-        onChange={(p, v) => mutateElem((el) => { (el as any)[p] = v })}
         onColor={(c) => mutateElem((el) => { el.color = c })}
         onRename={(n) => mutateElem((el) => { el.name = n })}
         onToggleKf={toggleKf}
@@ -696,6 +948,9 @@ export default function App() {
     </>
   )
 
+  // Reset state when expression changes
+  const switchExpr = (id: string) => { setActiveExprId(id); setActiveElemId(null); setPlacingKind(null); setPlayT(0); setPlaying(false) }
+
   return (
     <div className="w-full max-w-[100vw] bg-bg md:flex md:h-[100dvh] md:flex-col md:overflow-hidden" style={{ minHeight: 'min(100dvh, 100vh)' }}>
       {/* atmosphere */}
@@ -706,7 +961,7 @@ export default function App() {
         <div className="flex items-baseline gap-2">
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-orange to-orange-deep text-ink-deep shadow-glow ring-1 ring-white/10">🐻</span>
           <h1 className="font-display text-xl md:text-2xl leading-none">atticus <em className="not-italic text-orange italic font-display">face</em></h1>
-          <span className="hidden md:inline-block border-l border-line pl-2.5 ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">studio</span>
+          <span className="hidden md:inline-block border-l border-line pl-2.5 ml-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">v4 · grid</span>
         </div>
         <div className="flex-1" />
         <button
@@ -723,26 +978,79 @@ export default function App() {
         <Button size="sm" variant="primary" onClick={() => setExportOpen('c')}><Code2 className="h-4 w-4" /> C</Button>
       </header>
 
-      {/* Expression switcher — top-level navigation, every breakpoint */}
       <ExpressionSwitcher
         doc={doc}
         activeId={activeExprId}
-        onSelect={(id) => { setActiveExprId(id); setActiveElemId(null); setPlayT(0); setPlaying(false) }}
+        onSelect={switchExpr}
         onAdd={addExpression}
       />
 
-      {/* Body: mobile = block flow (page scrolls naturally) | desktop = stage + sidebar grid */}
       <div className="max-w-full block md:flex-1 md:min-h-0 md:grid md:grid-cols-[1fr_22rem] md:overflow-hidden">
         <main className="block bg-gradient-to-b from-bg via-bg to-bg-deep md:flex md:flex-col md:min-h-0 md:overflow-hidden">
-          <Stage
+          <GridStage
             doc={doc} expr={activeExpr} t={playT} selectionId={activeElemId}
+            showGrid={showGrid} symmetry={symmetry}
             onSelect={setActiveElemId}
-            onDragElem={(id, x, y) => mutateAnyElem(id, (el) => { el.x = x; el.y = y })}
+            onMoveElem={moveElem}
+            onResizeElem={resizeElem}
+            onPlace={placeElement}
+            placingKind={placingKind}
           />
-          <div className="px-4 py-2 flex flex-wrap gap-x-5 gap-y-1 text-[10px] font-mono text-ink-faint shrink-0">
-            <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">expr</span><b className="text-orange font-medium">{activeExpr?.name ?? '—'}</b></span>
-            <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">selected</span><b className="text-ink font-medium">{activeElem?.name ?? 'tap a part'}</b></span>
+
+          {/* Canvas toolbar — part picker + grid/symmetry/delete */}
+          <div className="px-3 md:px-5 pb-2 space-y-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-ink-faint mr-1">add:</span>
+              {(['ellipse', 'rect', 'arc'] as Kind[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => setPlacingKind(placingKind === k ? null : k)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 h-10 px-3 rounded-md border text-[11px] font-mono uppercase tracking-wider transition-all min-h-10',
+                    placingKind === k ? 'bg-orange text-ink-deep border-orange shadow-glow' : 'bg-surface/40 border-line text-ink-dim hover:border-orange hover:text-ink',
+                  )}
+                >
+                  <Plus className="h-3 w-3" /> {k}
+                </button>
+              ))}
+              <div className="flex-1" />
+              <button
+                onClick={() => setSymmetry((s) => !s)}
+                title="Symmetry — mirror edits left↔right"
+                className={cn(
+                  'inline-flex items-center gap-1.5 h-10 px-3 rounded-md border text-[11px] font-mono uppercase tracking-wider transition-all',
+                  symmetry ? 'bg-orange/15 text-orange border-orange/60' : 'bg-surface/40 border-line text-ink-dim hover:border-orange hover:text-ink',
+                )}
+              >
+                <FlipHorizontal2 className="h-3.5 w-3.5" /> sym
+              </button>
+              <button
+                onClick={() => setShowGrid((g) => !g)}
+                title="Toggle grid overlay"
+                className={cn(
+                  'inline-flex items-center gap-1.5 h-10 px-3 rounded-md border text-[11px] font-mono uppercase tracking-wider transition-all',
+                  showGrid ? 'bg-orange/15 text-orange border-orange/60' : 'bg-surface/40 border-line text-ink-dim hover:border-orange hover:text-ink',
+                )}
+              >
+                <Grid3x3 className="h-3.5 w-3.5" /> grid
+              </button>
+              <button
+                onClick={() => { if (activeElemId) deleteElement(activeElemId) }}
+                disabled={!activeElemId}
+                title="Delete selected part"
+                className="inline-flex items-center gap-1.5 h-10 px-3 rounded-md border border-line text-ink-dim hover:border-bad hover:text-bad text-[11px] font-mono uppercase tracking-wider transition-all disabled:opacity-40 disabled:hover:border-line disabled:hover:text-ink-dim"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> del
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-[10px] font-mono text-ink-faint">
+              <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">expr</span><b className="text-orange font-medium">{activeExpr?.name ?? '—'}</b></span>
+              <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">selected</span><b className="text-ink font-medium">{activeElem?.name ?? 'tap a part'}</b></span>
+              <span><span className="uppercase tracking-wider mr-1.5 text-[9px]">grid</span><b className="text-ink-dim font-medium">{GRID_COLS}×{GRID_ROWS}</b></span>
+            </div>
           </div>
+
+          {/* Playback */}
           <div className="flex items-center gap-2 px-4 py-2 shrink-0">
             <Button size="icon" variant="primary" onClick={() => setPlaying((p) => !p)} disabled={(activeExpr?.duration ?? 0) === 0} aria-label={playing ? 'pause' : 'play'}>
               {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -753,13 +1061,11 @@ export default function App() {
           </div>
         </main>
 
-        {/* Inspector — desktop sidebar (scrolls), mobile inline (no fixed sheet) */}
         <aside className="block bg-bg-deep md:border-l md:border-line md:min-h-0 md:overflow-y-auto">
           {inspector}
         </aside>
       </div>
 
-      {/* Export modal */}
       <Dialog open={!!exportOpen} onOpenChange={(o) => !o && setExportOpen(null)}>
         <DialogContent>
           <DialogHeader>
@@ -773,7 +1079,6 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Import modal */}
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Import <em className="text-orange italic">JSON</em></DialogTitle></DialogHeader>
