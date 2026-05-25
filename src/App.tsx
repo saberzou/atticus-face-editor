@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Play, Pause, Square, Save, FolderOpen, Upload, Code2, Braces, Copy, X, Plus, Trash2, Diamond, ChevronDown, Grid3x3, FlipHorizontal2 } from 'lucide-react'
-import { Button, Slider, Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from './lib/ui'
+import { Button, Slider, Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, NumberField } from './lib/ui'
 import { cn, uid } from './lib/util'
 import {
   type FaceDoc, type Expression, type FaceElement, type Kind,
@@ -25,56 +25,6 @@ function findMirrorRole(role: string): string | null {
   if (role.startsWith('left')) return 'right' + role.slice(4)
   if (role.startsWith('right')) return 'left' + role.slice(5)
   return null
-}
-
-/* ============================================================
- * NumberField: tap-to-type fallback for sub-cell precision
- * ============================================================ */
-function NumberField({
-  value, min, max, step = 1, onChange, className,
-}: { value: number; min: number; max: number; step?: number; onChange: (n: number) => void; className?: string }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(String(Math.round(value)))
-  const ref = useRef<HTMLInputElement>(null)
-
-  useEffect(() => { if (!editing) setDraft(String(Math.round(value))) }, [value, editing])
-  useEffect(() => { if (editing) { ref.current?.focus(); ref.current?.select() } }, [editing])
-
-  const commit = () => {
-    const n = parseFloat(draft)
-    if (!Number.isNaN(n)) onChange(Math.max(min, Math.min(max, n)))
-    setEditing(false)
-  }
-  if (editing) {
-    return (
-      <input
-        ref={ref}
-        type="number"
-        inputMode="numeric"
-        value={draft}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
-          else if (e.key === 'Escape') { setDraft(String(Math.round(value))); setEditing(false) }
-        }}
-        className={cn('h-11 md:h-10 w-full rounded-md bg-surface border border-orange px-2 text-right font-mono text-base md:text-xs text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-orange', className)}
-      />
-    )
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => setEditing(true)}
-      className={cn('h-11 md:h-9 w-full rounded-md bg-surface/60 border border-line px-2 text-right font-mono text-xs text-ink-dim hover:border-orange hover:text-ink transition-colors', className)}
-      title="Tap to type exact value"
-    >
-      {Math.round(value)}
-    </button>
-  )
 }
 
 /* ============================================================

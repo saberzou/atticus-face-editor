@@ -1,10 +1,12 @@
 import * as React from 'react'
-import * as TabsPrimitive from '@radix-ui/react-tabs'
-import * as SliderPrimitive from '@radix-ui/react-slider'
-import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Slider as BaseSlider } from '@base-ui/react/slider'
+import { Dialog as BaseDialog } from '@base-ui/react/dialog'
+import { NumberField as BaseNumberField } from '@base-ui/react/number-field'
 import { cn } from './util'
 
-/* Button */
+/* ============================================================
+ * Button — same surface as the old shadcn-flavored API
+ * ============================================================ */
 export const Button = React.forwardRef<
   HTMLButtonElement,
   React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'default' | 'primary' | 'ghost' | 'outline'; size?: 'sm' | 'md' | 'icon' }
@@ -25,97 +27,164 @@ export const Button = React.forwardRef<
 })
 Button.displayName = 'Button'
 
-/* Tabs */
-export const Tabs = TabsPrimitive.Root
-export const TabsList = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>>(
-  ({ className, ...props }, ref) => (
-    <TabsPrimitive.List
-      ref={ref}
-      className={cn('grid grid-cols-3 gap-1 p-1.5 bg-surface border border-line rounded-lg', className)}
-      {...props}
-    />
+/* ============================================================
+ * Slider — Base UI Slider, single-thumb, controlled
+ * Old API: value, onValueChange, min, max, step, disabled
+ * ============================================================ */
+type SliderProps = {
+  className?: string
+  value: number[]
+  onValueChange: (v: number[]) => void
+  min?: number
+  max?: number
+  step?: number
+  disabled?: boolean
+}
+export const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
+  ({ className, value, onValueChange, min, max, step, disabled }, ref) => (
+    <BaseSlider.Root
+      value={value[0]}
+      onValueChange={(v) => onValueChange([typeof v === 'number' ? v : v[0]])}
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      className={cn('relative flex w-full touch-none select-none items-center h-9', className)}
+    >
+      <BaseSlider.Control ref={ref} className="relative flex w-full items-center h-9 cursor-pointer">
+        <BaseSlider.Track className="relative h-1 w-full overflow-hidden rounded-full bg-surface-2 border border-line">
+          <BaseSlider.Indicator className="absolute h-full bg-orange" />
+        </BaseSlider.Track>
+        <BaseSlider.Thumb
+          aria-label="value"
+          className="absolute block h-5 w-5 rounded-full bg-orange ring-2 ring-ink/90 ring-offset-2 ring-offset-bg-deep transition-transform focus-visible:outline-none focus-visible:ring-orange data-[dragging]:scale-110"
+        />
+      </BaseSlider.Control>
+    </BaseSlider.Root>
   ),
 )
-TabsList.displayName = 'TabsList'
-export const TabsTrigger = React.forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>>(
-  ({ className, ...props }, ref) => (
-    <TabsPrimitive.Trigger
+Slider.displayName = 'Slider'
+
+/* ============================================================
+ * NumberField — Base UI NumberField with horizontal scrub area
+ * - Drag the label/glyph left/right to scrub the value (snaps to step)
+ * - Tap the input to type an exact value
+ * - +/- buttons (decoration; hold-to-repeat baked in)
+ * ============================================================ */
+type NumberFieldProps = {
+  value: number
+  onChange: (v: number) => void
+  min?: number
+  max?: number
+  step?: number
+  smallStep?: number
+  largeStep?: number
+  className?: string
+  scrubLabel?: React.ReactNode
+}
+export function NumberField({
+  value, onChange, min, max, step = 1, smallStep, largeStep, className, scrubLabel,
+}: NumberFieldProps) {
+  const id = React.useId()
+  return (
+    <BaseNumberField.Root
+      id={id}
+      value={value}
+      onValueChange={(v) => onChange(v ?? 0)}
+      min={min}
+      max={max}
+      step={step}
+      smallStep={smallStep}
+      largeStep={largeStep}
+      snapOnStep
+      className={cn('relative flex items-stretch w-full', className)}
+    >
+      {/* Scrub area: drag the label horizontally to change the value. */}
+      <BaseNumberField.ScrubArea
+        direction="horizontal"
+        pixelSensitivity={2}
+        className="select-none cursor-ew-resize flex items-center justify-center h-11 md:h-9 w-7 rounded-l-md border border-r-0 border-line bg-surface/60 text-ink-faint text-[10px] font-mono uppercase tracking-wider hover:border-orange hover:text-orange transition-colors data-[scrubbing]:bg-orange data-[scrubbing]:text-ink-deep data-[scrubbing]:border-orange"
+      >
+        <BaseNumberField.ScrubAreaCursor
+          className="z-[200] text-orange"
+        >
+          <svg width="26" height="14" viewBox="0 0 24 14" fill="currentColor" stroke="white" strokeWidth="1" style={{ display: 'block' }}>
+            <path d="M19.5 5.5L6.49737 5.51844V2L1 6.9999L6.5 12L6.49737 8.5L19.5 8.5V12L25 6.9999L19.5 2V5.5Z" />
+          </svg>
+        </BaseNumberField.ScrubAreaCursor>
+        <span aria-hidden>{scrubLabel ?? '↔'}</span>
+      </BaseNumberField.ScrubArea>
+      <BaseNumberField.Group className="flex-1 flex items-stretch">
+        <BaseNumberField.Input
+          className={cn(
+            'h-11 md:h-9 min-w-0 w-full rounded-r-md bg-surface/60 border border-line px-2 text-right font-mono text-base md:text-xs text-ink',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-orange focus:border-orange',
+            'data-[scrubbing]:border-orange data-[scrubbing]:text-orange',
+          )}
+        />
+      </BaseNumberField.Group>
+    </BaseNumberField.Root>
+  )
+}
+
+/* ============================================================
+ * Dialog — wraps Base UI Dialog with the same API the App.tsx uses
+ * Dialog (Root), DialogContent (Portal+Backdrop+Popup), DialogHeader, DialogTitle, DialogClose
+ * ============================================================ */
+type DialogProps = React.ComponentProps<typeof BaseDialog.Root>
+export const Dialog = ({ open, onOpenChange, children, ...rest }: DialogProps) => (
+  <BaseDialog.Root open={open} onOpenChange={onOpenChange} {...rest}>
+    {children as React.ReactNode}
+  </BaseDialog.Root>
+)
+
+export const DialogContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, children, ...props }, ref) => (
+  <BaseDialog.Portal>
+    <BaseDialog.Backdrop className="fixed inset-0 z-[90] bg-bg-deep/80 backdrop-blur-sm data-[starting-style]:opacity-0 data-[ending-style]:opacity-0 transition-opacity duration-200" />
+    <BaseDialog.Popup
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-dim transition-all',
-        'active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange',
-        'data-[state=active]:bg-gradient-to-b data-[state=active]:from-orange data-[state=active]:to-orange-deep',
-        'data-[state=active]:text-[oklch(0.16_0.05_50)] data-[state=active]:shadow-glow',
+        'fixed left-1/2 top-1/2 z-[100] grid w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 gap-4 border border-line bg-bg p-6 shadow-lg rounded-xl',
+        'data-[starting-style]:scale-95 data-[starting-style]:opacity-0',
+        'data-[ending-style]:scale-95 data-[ending-style]:opacity-0',
+        'transition-[opacity,transform] duration-200 ease-out',
         className,
       )}
       {...props}
-    />
-  ),
-)
-TabsTrigger.displayName = 'TabsTrigger'
-export const TabsContent = React.forwardRef<HTMLDivElement, React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>>(
-  ({ className, ...props }, ref) => (
-    <TabsPrimitive.Content ref={ref} className={cn('focus-visible:outline-none', className)} {...props} />
-  ),
-)
-TabsContent.displayName = 'TabsContent'
-
-/* Slider */
-export const Slider = React.forwardRef<
-  React.ElementRef<typeof SliderPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <SliderPrimitive.Root
-    ref={ref}
-    className={cn('relative flex w-full touch-none select-none items-center h-9', className)}
-    {...props}
-  >
-    <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-surface-2 border border-line">
-      <SliderPrimitive.Range className="absolute h-full bg-orange" />
-    </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-5 w-5 rounded-full bg-orange ring-2 ring-ink/90 ring-offset-2 ring-offset-bg-deep transition-transform focus-visible:outline-none focus-visible:ring-orange active:scale-110" />
-  </SliderPrimitive.Root>
-))
-Slider.displayName = 'Slider'
-
-/* Dialog */
-export const Dialog = DialogPrimitive.Root
-export const DialogTrigger = DialogPrimitive.Trigger
-export const DialogPortal = DialogPrimitive.Portal
-export const DialogClose = DialogPrimitive.Close
-export const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn('fixed inset-0 z-50 bg-bg-deep/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0', className)}
-    {...props}
-  />
-))
-DialogOverlay.displayName = 'DialogOverlay'
-export const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn('fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 gap-4 border border-line bg-bg p-6 shadow-lg rounded-xl', className)}
-      {...props}
     >
       {children}
-    </DialogPrimitive.Content>
-  </DialogPortal>
+    </BaseDialog.Popup>
+  </BaseDialog.Portal>
 ))
 DialogContent.displayName = 'DialogContent'
+
 export const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn('flex flex-col gap-1.5', className)} {...props} />
 )
+
 export const DialogTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h2 ref={ref} className={cn('text-2xl font-display leading-none', className)} {...props} />
+    <BaseDialog.Title
+      ref={ref as any}
+      className={cn('text-2xl font-display leading-none', className)}
+      {...(props as any)}
+    />
   ),
 )
 DialogTitle.displayName = 'DialogTitle'
+
+/* DialogClose — pass `asChild` to render the child as the close button (Base UI uses `render`) */
+type DialogCloseProps =
+  | (React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: false; children?: React.ReactNode })
+  | { asChild: true; children: React.ReactElement }
+export const DialogClose = (props: DialogCloseProps) => {
+  if ((props as any).asChild) {
+    const { children } = props as { asChild: true; children: React.ReactElement }
+    return <BaseDialog.Close render={children} />
+  }
+  const { className, ...rest } = props as React.ButtonHTMLAttributes<HTMLButtonElement>
+  return <BaseDialog.Close className={className} {...rest} />
+}
